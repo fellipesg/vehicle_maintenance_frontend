@@ -74,7 +74,7 @@ class _VehiclesPageState extends State<VehiclesPage> {
     try {
       final apiService = Provider.of<ApiService>(context, listen: false);
       final response = await apiService.getMyVehicles();
-      
+
       if (response.data['success'] == true && mounted) {
         setState(() {
           _vehicles = (response.data['data'] as List)
@@ -148,55 +148,71 @@ class _VehiclesPageState extends State<VehiclesPage> {
       );
     }
 
-    return RefreshIndicator(
-      onRefresh: _loadVehicles,
-      child: ListView.builder(
-        padding: const EdgeInsets.all(16),
-        itemCount: _vehicles.length,
-        itemBuilder: (context, index) {
-          final vehicle = _vehicles[index];
-          final maintenances = vehicle.maintenances ?? [];
-          
-          return Card(
-            margin: const EdgeInsets.only(bottom: 12),
-            child: ListTile(
-              leading: CircleAvatar(
-                backgroundColor: Theme.of(context).colorScheme.primary,
-                child: const Icon(Icons.directions_car, color: Colors.white),
-              ),
-              title: Text(
-                vehicle.displayName,
-                style: const TextStyle(fontWeight: FontWeight.bold),
-              ),
-              subtitle: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Placa: ${vehicle.licensePlate}'),
-                  Text('${vehicle.year} - ${vehicle.color ?? 'N/A'}'),
-                  if (maintenances.isNotEmpty)
-                    Text(
-                      '${maintenances.length} manutenção(ões)',
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.primary,
-                        fontSize: 12,
+    return Scaffold(
+      body: RefreshIndicator(
+        onRefresh: _loadVehicles,
+        child: ListView.builder(
+          padding: const EdgeInsets.all(16),
+          itemCount: _vehicles.length,
+          itemBuilder: (context, index) {
+            final vehicle = _vehicles[index];
+            final maintenances = vehicle.maintenances ?? [];
+
+            return Card(
+              margin: const EdgeInsets.only(bottom: 12),
+              child: ListTile(
+                leading: CircleAvatar(
+                  backgroundColor: Theme.of(context).colorScheme.primary,
+                  child: const Icon(Icons.directions_car, color: Colors.white),
+                ),
+                title: Text(
+                  vehicle.displayName,
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+                subtitle: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Placa: ${vehicle.licensePlate}'),
+                    Text('${vehicle.year} - ${vehicle.color ?? 'N/A'}'),
+                    if (maintenances.isNotEmpty)
+                      Text(
+                        '${maintenances.length} manutenção(ões)',
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.primary,
+                          fontSize: 12,
+                        ),
                       ),
+                  ],
+                ),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () async {
+                  final result = await Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => VehicleDetailPage(vehicleId: vehicle.id!),
                     ),
-                ],
+                  );
+                  if (result == true) {
+                    _loadVehicles();
+                  }
+                },
               ),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () async {
-                final result = await Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => VehicleDetailPage(vehicleId: vehicle.id!),
-                  ),
-                );
-                if (result == true) {
-                  _loadVehicles();
-                }
-              },
+            );
+          },
+        ),
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () async {
+          final result = await Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => const VehicleFormPage(),
             ),
           );
+          if (result == true) {
+            _loadVehicles();
+          }
         },
+        icon: const Icon(Icons.add),
+        label: const Text('Adicionar Veículo'),
       ),
     );
   }
@@ -208,7 +224,7 @@ class ProfilePage extends StatelessWidget {
   Future<void> _handleLogout(BuildContext context) async {
     final authService = Provider.of<AuthService>(context, listen: false);
     await authService.logout();
-    
+
     if (context.mounted) {
       Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute(builder: (_) => const LoginPage()),

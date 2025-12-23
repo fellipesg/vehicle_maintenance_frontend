@@ -20,14 +20,25 @@ class MaintenanceItem {
   });
 
   factory MaintenanceItem.fromJson(Map<String, dynamic> json) {
+    // Helper function to safely convert to double
+    double _parseDouble(dynamic value) {
+      if (value == null) return 0.0;
+      if (value is double) return value;
+      if (value is int) return value.toDouble();
+      if (value is String) {
+        return double.tryParse(value) ?? 0.0;
+      }
+      return 0.0;
+    }
+
     return MaintenanceItem(
       id: json['id'],
       maintenanceId: json['maintenance_id'],
       name: json['name'] ?? '',
       description: json['description'],
       quantity: json['quantity'] ?? 1,
-      unitPrice: (json['unit_price'] ?? 0.0).toDouble(),
-      totalPrice: (json['total_price'] ?? 0.0).toDouble(),
+      unitPrice: _parseDouble(json['unit_price']),
+      totalPrice: _parseDouble(json['total_price']),
       partNumber: json['part_number'],
     );
   }
@@ -45,4 +56,3 @@ class MaintenanceItem {
     };
   }
 }
-

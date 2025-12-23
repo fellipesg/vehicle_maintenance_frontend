@@ -4,8 +4,10 @@ import 'package:file_picker/file_picker.dart';
 import 'package:dio/dio.dart';
 import '../../models/maintenance.dart';
 import '../../models/maintenance_item.dart';
+import '../../models/workshop.dart';
 import '../../services/api_service.dart';
 import 'maintenance_item_form_dialog.dart';
+import '../workshops/workshop_search_page.dart';
 
 class MaintenanceFormPage extends StatefulWidget {
   final int vehicleId;
@@ -34,6 +36,7 @@ class _MaintenanceFormPageState extends State<MaintenanceFormPage> {
   bool _isLoading = false;
   List<MaintenanceItem> _items = [];
   List<String> _invoiceFiles = [];
+  Workshop? _selectedWorkshop;
 
   final List<String> _maintenanceTypes = [
     'preventive',
@@ -57,12 +60,51 @@ class _MaintenanceFormPageState extends State<MaintenanceFormPage> {
     if (widget.maintenance != null) {
       _descriptionController.text = widget.maintenance!.description ?? '';
       _workshopNameController.text = widget.maintenance!.workshopName ?? '';
-      _kilometersController.text = widget.maintenance!.kilometers?.toString() ?? '';
+      _kilometersController.text =
+          widget.maintenance!.kilometers?.toString() ?? '';
       _maintenanceType = widget.maintenance!.maintenanceType;
       _serviceCategory = widget.maintenance!.serviceCategory;
       _maintenanceDate = widget.maintenance!.maintenanceDate;
-      _isManufacturerRequired = widget.maintenance!.isManufacturerRequired ?? false;
+      _isManufacturerRequired =
+          widget.maintenance!.isManufacturerRequired ?? false;
       _items = widget.maintenance!.items ?? [];
+      // Load workshop if exists
+      if (widget.maintenance!.workshopId != null) {
+        _loadWorkshop(widget.maintenance!.workshopId!);
+      }
+    }
+  }
+
+  Future<void> _loadWorkshop(int workshopId) async {
+    try {
+      final apiService = Provider.of<ApiService>(context, listen: false);
+      final response = await apiService.getWorkshop(workshopId.toString());
+      if (response.data['success'] == true) {
+        setState(() {
+          _selectedWorkshop = Workshop.fromJson(response.data['data']);
+          _workshopNameController.text = _selectedWorkshop!.name;
+        });
+      }
+    } catch (e) {
+      // Silently fail
+    }
+  }
+
+  Future<void> _selectWorkshop() async {
+    final workshop = await Navigator.push<Workshop>(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const WorkshopSearchPage(
+          allowCreate: true,
+        ),
+      ),
+    );
+
+    if (workshop != null) {
+      setState(() {
+        _selectedWorkshop = workshop;
+        _workshopNameController.text = workshop.name;
+      });
     }
   }
 
@@ -130,7 +172,10 @@ class _MaintenanceFormPageState extends State<MaintenanceFormPage> {
 
       if (result != null && result.files.isNotEmpty) {
         setState(() {
-          _invoiceFiles = result.files.map((f) => f.path!).where((p) => p.isNotEmpty).toList();
+          _invoiceFiles = result.files
+              .map((f) => f.path!)
+              .where((p) => p.isNotEmpty)
+              .toList();
         });
       }
     } catch (e) {
@@ -154,7 +199,7 @@ class _MaintenanceFormPageState extends State<MaintenanceFormPage> {
 
     try {
       final apiService = Provider.of<ApiService>(context, listen: false);
-      
+
       // Ensure service_category is not null (it's required)
       if (_serviceCategory == null) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -168,9 +213,10 @@ class _MaintenanceFormPageState extends State<MaintenanceFormPage> {
         });
         return;
       }
-      
+
       final formData = FormData.fromMap({
         'vehicle_id': widget.vehicleId,
+        'workshop_id': _selectedWorkshop?.id,
         'maintenance_type': _maintenanceType,
         'description': _descriptionController.text.trim().isEmpty
             ? null
@@ -183,7 +229,9 @@ class _MaintenanceFormPageState extends State<MaintenanceFormPage> {
             ? null
             : int.tryParse(_kilometersController.text.trim()),
         'service_category': _serviceCategory!,
-        'is_manufacturer_required': _isManufacturerRequired ? 1 : 0, // Send as int to ensure boolean conversion
+        'is_manufacturer_required': _isManufacturerRequired
+            ? 1
+            : 0, // Send as int to ensure boolean conversion
         'items': _items.map((item) => item.toJson()).toList(),
       });
 
@@ -212,7 +260,7 @@ class _MaintenanceFormPageState extends State<MaintenanceFormPage> {
           });
           return;
         }
-        
+
         final updateData = {
           'vehicle_id': widget.vehicleId,
           'maintenance_type': _maintenanceType,
@@ -239,7 +287,7 @@ class _MaintenanceFormPageState extends State<MaintenanceFormPage> {
       }
 
       if (response.data['success'] == true && mounted) {
-        Navigator.of(context).pop(true);
+        // Show success message before popping
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(widget.maintenance != null
@@ -248,8 +296,11 @@ class _MaintenanceFormPageState extends State<MaintenanceFormPage> {
             backgroundColor: Colors.green,
           ),
         );
+        // Pop and return true to trigger list refresh
+        Navigator.of(context).pop(true);
       } else {
-        throw Exception(response.data['message'] ?? 'Erro ao salvar manutenção');
+        throw Exception(
+            response.data['message'] ?? 'Erro ao salvar manutenção');
       }
     } catch (e) {
       if (mounted) {
@@ -273,7 +324,9 @@ class _MaintenanceFormPageState extends State<MaintenanceFormPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.maintenance != null ? 'Editar Manutenção' : 'Nova Manutenção'),
+        title: Text(widget.maintenance != null
+            ? 'Editar Manutenção'
+            : 'Nova Manutenção'),
       ),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -347,14 +400,53 @@ class _MaintenanceFormPageState extends State<MaintenanceFormPage> {
                   },
                 ),
                 const SizedBox(height: 16),
-                TextFormField(
-                  controller: _workshopNameController,
-                  decoration: const InputDecoration(
-                    labelText: 'Nome da Oficina',
-                    prefixIcon: Icon(Icons.store),
-                    border: OutlineInputBorder(),
+                // Oficina
+                InkWell(
+                  onTap: _selectWorkshop,
+                  child: InputDecorator(
+                    decoration: InputDecoration(
+                      labelText: 'Oficina',
+                      prefixIcon: const Icon(Icons.build_circle),
+                      suffixIcon: _selectedWorkshop != null
+                          ? IconButton(
+                              icon: const Icon(Icons.clear),
+                              onPressed: () {
+                                setState(() {
+                                  _selectedWorkshop = null;
+                                  _workshopNameController.clear();
+                                });
+                              },
+                            )
+                          : const Icon(Icons.search),
+                      border: const OutlineInputBorder(),
+                      helperText: _selectedWorkshop != null
+                          ? 'Toque para trocar de oficina'
+                          : 'Toque para buscar ou adicionar oficina',
+                    ),
+                    child: Text(
+                      _selectedWorkshop != null
+                          ? _selectedWorkshop!.name
+                          : _workshopNameController.text.isEmpty
+                              ? 'Buscar oficina...'
+                              : _workshopNameController.text,
+                      style: TextStyle(
+                        color: _selectedWorkshop != null
+                            ? Theme.of(context).colorScheme.primary
+                            : null,
+                      ),
+                    ),
                   ),
                 ),
+                if (_selectedWorkshop != null) ...[
+                  const SizedBox(height: 8),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                    child: Text(
+                      _selectedWorkshop!.shortAddress,
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 16),
                 TextFormField(
                   controller: _descriptionController,
@@ -471,7 +563,8 @@ class _MaintenanceFormPageState extends State<MaintenanceFormPage> {
                           width: 20,
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
-                      : Text(widget.maintenance != null ? 'Atualizar' : 'Salvar'),
+                      : Text(
+                          widget.maintenance != null ? 'Atualizar' : 'Salvar'),
                 ),
               ],
             ),
@@ -515,4 +608,3 @@ class _MaintenanceFormPageState extends State<MaintenanceFormPage> {
     }
   }
 }
-

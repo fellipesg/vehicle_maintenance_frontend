@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
+import 'package:printing/printing.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:path_provider/path_provider.dart';
-import 'dart:io';
 import '../../models/maintenance.dart';
 import '../../models/maintenance_item.dart';
 import '../../models/invoice.dart';
@@ -98,36 +97,17 @@ class _MaintenanceDetailPageState extends State<MaintenanceDetailPage> {
       // Download the file using the API service
       final response = await apiService.downloadInvoice(invoice.id.toString());
 
-      // Get temporary directory
-      final tempDir = await getTemporaryDirectory();
-      final filePath = '${tempDir.path}/${invoice.fileName}';
-      final file = File(filePath);
-
-      // Write the file
-      await file.writeAsBytes(response.data);
-
       // Close loading snackbar
       if (mounted && messenger != null) {
         messenger.hideCurrentSnackBar();
       }
 
-      // Open the file
-      final uri = Uri.file(filePath);
-
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(
-          uri,
-          mode: LaunchMode.externalApplication,
+      // Open the PDF using printing package (better for Android)
+      // This opens a native PDF viewer
+      if (mounted) {
+        await Printing.layoutPdf(
+          onLayout: (format) async => response.data,
         );
-      } else {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Não foi possível abrir a nota fiscal'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
       }
     } catch (e) {
       // Close loading snackbar on error
@@ -231,8 +211,9 @@ class _MaintenanceDetailPageState extends State<MaintenanceDetailPage> {
                         ],
                       ),
                       const Divider(height: 32),
-                      if (_maintenance!.workshopName != null)
-                        _buildInfoRow('Oficina', _maintenance!.workshopName!),
+                      if (_maintenance!.workshop != null ||
+                          _maintenance!.workshopName != null)
+                        _buildWorkshopSection(),
                       if (_maintenance!.kilometers != null)
                         _buildInfoRow(
                             'Quilometragem', '${_maintenance!.kilometers} km'),
@@ -343,6 +324,220 @@ class _MaintenanceDetailPageState extends State<MaintenanceDetailPage> {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildWorkshopSection() {
+    final workshop = _maintenance!.workshop;
+    final workshopName = _maintenance!.workshopName;
+
+    if (workshop == null && workshopName == null) {
+      return const SizedBox.shrink();
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(
+              Icons.build_circle,
+              color: Theme.of(context).colorScheme.primary,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              'Oficina',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        if (workshop != null) ...[
+          // Nome da oficina
+          Text(
+            workshop.name,
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+          ),
+          const SizedBox(height: 8),
+          // Telefone
+          InkWell(
+            onTap: () async {
+              final uri = Uri.parse('tel:${workshop.phone}');
+              if (await canLaunchUrl(uri)) {
+                await launchUrl(uri);
+              }
+            },
+            child: Row(
+              children: [
+                const Icon(Icons.phone, size: 20),
+                const SizedBox(width: 8),
+                Text(
+                  workshop.phone,
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.primary,
+                    decoration: TextDecoration.underline,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 4),
+          // WhatsApp
+          if (workshop.whatsapp != null)
+            InkWell(
+              onTap: () async {
+                final phone = workshop.whatsapp!.replaceAll(RegExp(r'\D'), '');
+                final uri = Uri.parse('https://wa.me/55$phone');
+                if (await canLaunchUrl(uri)) {
+                  await launchUrl(uri, mode: LaunchMode.externalApplication);
+                }
+              },
+              child: Row(
+                children: [
+                  const Icon(Icons.chat, size: 20),
+                  const SizedBox(width: 8),
+                  Text(
+                    'WhatsApp: ${workshop.whatsapp}',
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.primary,
+                      decoration: TextDecoration.underline,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          if (workshop.whatsapp != null) const SizedBox(height: 4),
+          // Email
+          if (workshop.email != null)
+            InkWell(
+              onTap: () async {
+                final uri = Uri.parse('mailto:${workshop.email}');
+                if (await canLaunchUrl(uri)) {
+                  await launchUrl(uri);
+                }
+              },
+              child: Row(
+                children: [
+                  const Icon(Icons.email, size: 20),
+                  const SizedBox(width: 8),
+                  Text(
+                    workshop.email!,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.primary,
+                      decoration: TextDecoration.underline,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          if (workshop.email != null) const SizedBox(height: 8),
+          // Endereço (clicável para abrir no mapa)
+          InkWell(
+            onTap: () async {
+              final url = workshop.googleMapsUrl;
+              if (url != null) {
+                final uri = Uri.parse(url);
+                if (await canLaunchUrl(uri)) {
+                  await launchUrl(uri, mode: LaunchMode.externalApplication);
+                }
+              }
+            },
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(Icons.location_on, size: 20),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    workshop.shortAddress,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.primary,
+                      decoration: TextDecoration.underline,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+          // Redes Sociais
+          if (workshop.facebook != null || workshop.instagram != null)
+            Wrap(
+              spacing: 16,
+              children: [
+                if (workshop.facebook != null)
+                  InkWell(
+                    onTap: () async {
+                      final uri = Uri.parse(workshop.facebook!);
+                      if (await canLaunchUrl(uri)) {
+                        await launchUrl(uri,
+                            mode: LaunchMode.externalApplication);
+                      }
+                    },
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.facebook,
+                          size: 20,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          'Facebook',
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.primary,
+                            decoration: TextDecoration.underline,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                if (workshop.instagram != null)
+                  InkWell(
+                    onTap: () async {
+                      final uri = Uri.parse(workshop.instagram!);
+                      if (await canLaunchUrl(uri)) {
+                        await launchUrl(uri,
+                            mode: LaunchMode.externalApplication);
+                      }
+                    },
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.camera_alt,
+                          size: 20,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          'Instagram',
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.primary,
+                            decoration: TextDecoration.underline,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+        ] else ...[
+          // Fallback para workshop_name quando não há workshop completo
+          Text(
+            workshopName!,
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+          ),
+        ],
+        const SizedBox(height: 16),
+      ],
     );
   }
 

@@ -1,10 +1,12 @@
 import 'maintenance_item.dart';
 import 'invoice.dart';
+import 'workshop.dart';
 
 class Maintenance {
   final int? id;
   final int vehicleId;
   final int? userId;
+  final int? workshopId;
   final String maintenanceType;
   final String? description;
   final String? workshopName;
@@ -15,11 +17,13 @@ class Maintenance {
   final List<MaintenanceItem>? items;
   final List<Invoice>? invoices;
   final List<dynamic>? checklists;
+  final Workshop? workshop;
 
   Maintenance({
     this.id,
     required this.vehicleId,
     this.userId,
+    this.workshopId,
     required this.maintenanceType,
     this.description,
     this.workshopName,
@@ -30,6 +34,7 @@ class Maintenance {
     this.items,
     this.invoices,
     this.checklists,
+    this.workshop,
   });
 
   factory Maintenance.fromJson(Map<String, dynamic> json) {
@@ -37,6 +42,7 @@ class Maintenance {
       id: json['id'],
       vehicleId: json['vehicle_id'] ?? 0,
       userId: json['user_id'],
+      workshopId: json['workshop_id'],
       maintenanceType: json['maintenance_type'] ?? '',
       description: json['description'],
       workshopName: json['workshop_name'],
@@ -57,6 +63,8 @@ class Maintenance {
               .toList()
           : null,
       checklists: json['checklists'],
+      workshop:
+          json['workshop'] != null ? Workshop.fromJson(json['workshop']) : null,
     );
   }
 
@@ -74,4 +82,3 @@ class Maintenance {
     };
   }
 }
-

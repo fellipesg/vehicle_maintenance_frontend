@@ -32,7 +32,8 @@ class _MaintenanceListPageState extends State<MaintenanceListPage> {
       Response response;
 
       if (widget.vehicleId != null) {
-        response = await apiService.getVehicleMaintenances(widget.vehicleId.toString());
+        response = await apiService
+            .getVehicleMaintenances(widget.vehicleId.toString());
       } else {
         response = await apiService.getMaintenances();
       }
@@ -41,7 +42,8 @@ class _MaintenanceListPageState extends State<MaintenanceListPage> {
         setState(() {
           _maintenances = (response.data['data'] as List)
               .map((json) => Maintenance.fromJson(json))
-              .toList();
+              .toList()
+            ..sort((a, b) => a.maintenanceDate.compareTo(b.maintenanceDate));
           _isLoading = false;
         });
       }
@@ -153,21 +155,25 @@ class _MaintenanceListPageState extends State<MaintenanceListPage> {
                         margin: const EdgeInsets.only(bottom: 12),
                         child: ListTile(
                           leading: CircleAvatar(
-                            backgroundColor: Theme.of(context).colorScheme.primary,
+                            backgroundColor:
+                                Theme.of(context).colorScheme.primary,
                             child: Icon(
-                              _getMaintenanceTypeIcon(maintenance.maintenanceType),
+                              _getMaintenanceTypeIcon(
+                                  maintenance.maintenanceType),
                               color: Colors.white,
                             ),
                           ),
                           title: Text(
-                            _getMaintenanceTypeLabel(maintenance.maintenanceType),
+                            _getMaintenanceTypeLabel(
+                                maintenance.maintenanceType),
                             style: const TextStyle(fontWeight: FontWeight.bold),
                           ),
                           subtitle: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                DateFormat('dd/MM/yyyy').format(maintenance.maintenanceDate),
+                                DateFormat('dd/MM/yyyy')
+                                    .format(maintenance.maintenanceDate),
                               ),
                               if (maintenance.workshopName != null)
                                 Text(maintenance.workshopName!),
@@ -193,34 +199,39 @@ class _MaintenanceListPageState extends State<MaintenanceListPage> {
                                   children: [
                                     Icon(Icons.delete, color: Colors.red),
                                     SizedBox(width: 8),
-                                    Text('Excluir', style: TextStyle(color: Colors.red)),
+                                    Text('Excluir',
+                                        style: TextStyle(color: Colors.red)),
                                   ],
                                 ),
                               ),
                             ],
                             onSelected: (value) {
                               if (value == 'edit') {
-                                Navigator.of(context).push(
-                                  MaterialPageRoute(
-                                    builder: (_) => MaintenanceFormPage(
-                                      vehicleId: maintenance.vehicleId,
-                                      maintenance: maintenance,
-                                    ),
-                                  ),
-                                ).then((_) => _loadMaintenances());
+                                Navigator.of(context)
+                                    .push(
+                                      MaterialPageRoute(
+                                        builder: (_) => MaintenanceFormPage(
+                                          vehicleId: maintenance.vehicleId,
+                                          maintenance: maintenance,
+                                        ),
+                                      ),
+                                    )
+                                    .then((_) => _loadMaintenances());
                               } else if (value == 'delete') {
                                 _handleDelete(maintenance);
                               }
                             },
                           ),
                           onTap: () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) => MaintenanceDetailPage(
-                                  maintenanceId: maintenance.id!,
-                                ),
-                              ),
-                            ).then((_) => _loadMaintenances());
+                            Navigator.of(context)
+                                .push(
+                                  MaterialPageRoute(
+                                    builder: (_) => MaintenanceDetailPage(
+                                      maintenanceId: maintenance.id!,
+                                    ),
+                                  ),
+                                )
+                                .then((_) => _loadMaintenances());
                           },
                         ),
                       );
@@ -232,7 +243,8 @@ class _MaintenanceListPageState extends State<MaintenanceListPage> {
               onPressed: () async {
                 final result = await Navigator.of(context).push(
                   MaterialPageRoute(
-                    builder: (_) => MaintenanceFormPage(vehicleId: widget.vehicleId!),
+                    builder: (_) =>
+                        MaintenanceFormPage(vehicleId: widget.vehicleId!),
                   ),
                 );
                 if (result == true) {
@@ -273,4 +285,3 @@ class _MaintenanceListPageState extends State<MaintenanceListPage> {
     }
   }
 }
-

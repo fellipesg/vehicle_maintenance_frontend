@@ -39,6 +39,10 @@ dependencies:
   
   # WebView for OAuth
   webview_flutter: ^4.4.2
+  
+  # Firebase
+  firebase_core: ^2.24.2
+  firebase_messaging: ^14.7.9
 
 dev_dependencies:
   flutter_test:

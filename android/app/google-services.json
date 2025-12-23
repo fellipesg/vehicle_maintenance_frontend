@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "61844221484",
+    "project_id": "vehicle-maintenance-a9e32",
+    "storage_bucket": "vehicle-maintenance-a9e32.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:61844221484:android:1774c0e714ee36374c2b89",
+        "android_client_info": {
+          "package_name": "com.example.vehicle_maintenance"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB8uwEcZiatknw-aEpzVBnAHip3H9M9PrE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

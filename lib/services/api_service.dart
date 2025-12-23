@@ -32,7 +32,7 @@ class ApiService {
 
   // Getter for dio (for AuthService and other services)
   Dio get dio => _dio;
-  
+
   // Get user's vehicles
   Future<Response> getMyVehicles() async {
     return await _dio.get('/my-vehicles');
@@ -90,7 +90,8 @@ class ApiService {
     );
   }
 
-  Future<Response> updateMaintenance(String id, Map<String, dynamic> data) async {
+  Future<Response> updateMaintenance(
+      String id, Map<String, dynamic> data) async {
     return await _dio.put('/maintenances/$id', data: data);
   }
 
@@ -121,5 +122,25 @@ class ApiService {
   Future<Response> deleteInvoice(String id) async {
     return await _dio.delete('/invoices/$id');
   }
-}
 
+  // Workshop endpoints
+  Future<Response> getWorkshops({Map<String, dynamic>? queryParams}) async {
+    return await _dio.get('/workshops', queryParameters: queryParams);
+  }
+
+  Future<Response> getWorkshop(String id) async {
+    return await _dio.get('/workshops/$id');
+  }
+
+  Future<Response> createWorkshop(Map<String, dynamic> data) async {
+    return await _dio.post('/workshops', data: data);
+  }
+
+  Future<Response> updateWorkshop(String id, Map<String, dynamic> data) async {
+    return await _dio.put('/workshops/$id', data: data);
+  }
+
+  Future<Response> deleteWorkshop(String id) async {
+    return await _dio.delete('/workshops/$id');
+  }
+}

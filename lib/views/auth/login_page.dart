@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../home_page.dart';
 import '../../services/api_service.dart';
 import '../../services/auth_service.dart';
@@ -80,18 +81,56 @@ class _LoginPageState extends State<LoginPage> {
 
     try {
       final authService = Provider.of<AuthService>(context, listen: false);
-      final redirectUrl = await authService.getOAuthRedirectUrl(provider);
+      // Force account selection to allow users to choose a different account
+      final redirectUrl = await authService.getOAuthRedirectUrl(provider,
+          forceAccountSelection: true);
 
       if (redirectUrl != null && mounted) {
-        // Navigate to OAuth webview page
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => OAuthWebViewPage(
-              provider: provider,
-              redirectUrl: redirectUrl,
+        // Try to open in native browser first (preferred method)
+        // This is required by Google's security policy
+        final uri = Uri.parse(redirectUrl);
+        bool useNativeBrowser = false;
+
+        // Try to launch in native browser
+        if (await canLaunchUrl(uri)) {
+          try {
+            await launchUrl(
+              uri,
+              mode: LaunchMode.externalApplication,
+            );
+            useNativeBrowser = true;
+
+            // Show message to user
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    'Por favor, complete o login no navegador. '
+                    'Você será redirecionado de volta ao app após o login.',
+                  ),
+                  duration: const Duration(seconds: 5),
+                  backgroundColor: Colors.blue,
+                ),
+              );
+            }
+          } catch (e) {
+            // If native browser fails, fall back to WebView with custom User-Agent
+            useNativeBrowser = false;
+          }
+        }
+
+        // Fallback: Use WebView with custom User-Agent if native browser is not available
+        // This simulates a real browser to bypass Google's restrictions
+        if (!useNativeBrowser && mounted) {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => OAuthWebViewPage(
+                provider: provider,
+                redirectUrl: redirectUrl,
+              ),
             ),
-          ),
-        );
+          );
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -172,7 +211,9 @@ class _LoginPageState extends State<LoginPage> {
                     prefixIcon: const Icon(Icons.lock),
                     suffixIcon: IconButton(
                       icon: Icon(
-                        _obscurePassword ? Icons.visibility : Icons.visibility_off,
+                        _obscurePassword
+                            ? Icons.visibility
+                            : Icons.visibility_off,
                       ),
                       onPressed: () {
                         setState(() {
@@ -219,7 +260,8 @@ class _LoginPageState extends State<LoginPage> {
                 ),
                 const SizedBox(height: 24),
                 OutlinedButton.icon(
-                  onPressed: _isLoading ? null : () => _handleSSOLogin('google'),
+                  onPressed:
+                      _isLoading ? null : () => _handleSSOLogin('google'),
                   icon: const Icon(Icons.g_mobiledata, size: 28),
                   label: const Text('Continuar com Google'),
                   style: OutlinedButton.styleFrom(
@@ -228,7 +270,8 @@ class _LoginPageState extends State<LoginPage> {
                 ),
                 const SizedBox(height: 12),
                 OutlinedButton.icon(
-                  onPressed: _isLoading ? null : () => _handleSSOLogin('facebook'),
+                  onPressed:
+                      _isLoading ? null : () => _handleSSOLogin('facebook'),
                   icon: const Icon(Icons.facebook, size: 28),
                   label: const Text('Continuar com Facebook'),
                   style: OutlinedButton.styleFrom(
@@ -237,7 +280,8 @@ class _LoginPageState extends State<LoginPage> {
                 ),
                 const SizedBox(height: 12),
                 OutlinedButton.icon(
-                  onPressed: _isLoading ? null : () => _handleSSOLogin('twitter'),
+                  onPressed:
+                      _isLoading ? null : () => _handleSSOLogin('twitter'),
                   icon: const Icon(Icons.alternate_email, size: 28),
                   label: const Text('Continuar com Twitter/X'),
                   style: OutlinedButton.styleFrom(
@@ -275,4 +319,3 @@ class _LoginPageState extends State<LoginPage> {
     );
   }
 }
-
