@@ -24,8 +24,11 @@ class MyApp extends StatefulWidget {
 
 class _MyAppState extends State<MyApp> {
   final ApiService _apiService = ApiService(
-      baseUrl:
-          'https://portions-pediatric-car-mustang.trycloudflare.com/api/v1');
+    baseUrl: const String.fromEnvironment(
+      'API_BASE_URL',
+      defaultValue: 'http://10.0.2.2:8000/api/v1',
+    ),
+  );
   late final AuthService _authService;
   bool _isLoading = true;
 

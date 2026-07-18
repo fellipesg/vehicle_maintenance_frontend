@@ -1,76 +1,138 @@
-# Vehicle Maintenance - Flutter App
+# Vehicle Maintenance — Frontend (Flutter)
 
-Aplicativo mobile Flutter para registro de manutenções de veículos.
+App Flutter para registro e consulta do histórico de manutenções veiculares, integrado à API Laravel.
+
+> Backend: [`vehicle_maintenance`](https://github.com/fellipesg/vehicle_maintenance)
+
+## Stack
+
+| Área | Tecnologia |
+|------|------------|
+| Framework | Flutter 3 · Dart 3 |
+| Estado | Provider |
+| HTTP | Dio / http |
+| Auth | Token local (`shared_preferences`) + OAuth via WebView |
+| Arquivos | `file_picker`, PDF (`pdf` / `printing`) |
+| Push | Firebase Cloud Messaging |
 
 ## Pré-requisitos
 
-- Flutter SDK (versão 3.0 ou superior)
-- Dart SDK
-- Android Studio / Xcode (para desenvolvimento mobile)
+- [Flutter SDK](https://docs.flutter.dev/get-started/install) ≥ 3.0 (`flutter doctor` limpo)
+- Android Studio / Xcode conforme a plataforma alvo
+- Backend rodando (veja o README do repositório backend)
 
-## Instalação
+## Início rápido
 
-1. Instale o Flutter seguindo a [documentação oficial](https://flutter.dev/docs/get-started/install)
-
-2. Clone ou navegue até o diretório do projeto:
 ```bash
-cd ~/vehicle_maintenance/frontend
-```
+git clone https://github.com/fellipesg/vehicle_maintenance_frontend.git
+cd vehicle_maintenance_frontend
 
-3. Instale as dependências:
-```bash
 flutter pub get
 ```
 
-## Executando o App
+### Configurar URL da API
 
-### Android
+A base URL é definida via `--dart-define` (recomendado) ou pelo valor padrão em `lib/main.dart`.
+
+| Ambiente | URL sugerida |
+|----------|----------------|
+| Emulador Android | `http://10.0.2.2:8000/api/v1` |
+| Simulador iOS | `http://127.0.0.1:8000/api/v1` |
+| Device físico | `http://<IP-da-sua-máquina>:8000/api/v1` |
+| Túnel (ngrok/cloudflare) | `https://<seu-host>/api/v1` |
+
 ```bash
+flutter run --dart-define=API_BASE_URL=http://10.0.2.2:8000/api/v1
+```
+
+> Em Android 9+, HTTP claro exige `usesCleartextTraffic` / network security config no emulador/dev. Em produção use HTTPS.
+
+### Rodar
+
+```bash
+# listar devices
+flutter devices
+
 flutter run
+# ou
+flutter run -d chrome          # web (smoke test)
+flutter run -d macos           # desktop, se habilitado
 ```
 
-### iOS
+## Firebase (opcional, push notifications)
+
+Arquivos com chaves **não** entram no git:
+
+- `android/app/google-services.json`
+- `lib/firebase_options.dart`
+
+Setup:
+
 ```bash
-flutter run
+cp android/app/google-services.json.example android/app/google-services.json
+cp lib/firebase_options.dart.example lib/firebase_options.dart
+# preencha com dados do Firebase Console
+# ou:
+dart pub global activate flutterfire_cli
+flutterfire configure
 ```
 
-### Web (para testes)
+Detalhes: [FIREBASE_SETUP.md](./FIREBASE_SETUP.md).
+
+Sem Firebase configurado, remova/comente a inicialização em `main.dart` antes de rodar, ou complete o setup acima.
+
+## Build de release
+
 ```bash
-flutter run -d chrome
+# Android APK
+flutter build apk --release \
+  --dart-define=API_BASE_URL=https://sua-api.exemplo.com/api/v1
+
+# Android App Bundle (Play Store)
+flutter build appbundle --release \
+  --dart-define=API_BASE_URL=https://sua-api.exemplo.com/api/v1
+
+# iOS (macOS + Xcode)
+flutter build ios --release \
+  --dart-define=API_BASE_URL=https://sua-api.exemplo.com/api/v1
 ```
 
-## Estrutura do Projeto
+Há também scripts auxiliares no repositório (`build-apk.sh`, `clean-and-build.sh`) para builds locais.
+
+## Estrutura
 
 ```
 lib/
-├── models/          # Modelos de dados
-├── services/        # Serviços (API, storage, etc.)
-├── views/           # Telas/Views
-├── controllers/     # Controllers/ViewModels
-└── widgets/         # Widgets reutilizáveis
+├── main.dart
+├── models/          # DTOs (vehicle, maintenance, invoice…)
+├── services/        # API, auth, storage
+├── views/           # Telas
+├── controllers/     # ViewModels / estado
+└── widgets/         # Componentes reutilizáveis
 ```
-
-## Configuração da API
-
-Edite o arquivo `lib/services/api_service.dart` e altere a `baseUrl` para o endereço do seu backend:
-
-```dart
-ApiService(baseUrl: 'http://seu-ip:8080/api/v1')
-```
-
-Para Android, use `10.0.2.2` em vez de `localhost` quando testando no emulador.
 
 ## Funcionalidades
 
-- [ ] Cadastro de veículos (placa/RENAVAM)
-- [ ] Registro de manutenções
-- [ ] Upload de notas fiscais (PDF)
-- [ ] Checklist inicial e final
-- [ ] Histórico completo de manutenções
-- [ ] Exportação para PDF
-- [ ] Busca de veículos por placa/RENAVAM
+- Login / registro (API + OAuth quando habilitado no backend)
+- Cadastro e listagem de veículos
+- Registro de manutenções e itens
+- Upload de notas fiscais
+- Histórico e exportação (via API)
+- Notificações push (Firebase)
 
-## Desenvolvimento
+## Qualidade
 
-Este é um projeto em desenvolvimento. As funcionalidades serão implementadas progressivamente.
+```bash
+flutter analyze
+flutter test
+```
 
+## Segurança
+
+- Não committe `google-services.json`, `firebase_options.dart` nem keystores
+- Prefira HTTPS + `--dart-define` para a URL da API em builds distribuídos
+- Tokens ficam em `shared_preferences` — trate device loss / logout adequadamente
+
+## Licença
+
+MIT
