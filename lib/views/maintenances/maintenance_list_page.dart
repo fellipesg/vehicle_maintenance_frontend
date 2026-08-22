@@ -3,7 +3,9 @@ import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'package:dio/dio.dart';
 import '../../models/maintenance.dart';
+import '../../models/vehicle.dart';
 import '../../services/api_service.dart';
+import '../../widgets/vehicle_cover_avatar.dart';
 import 'maintenance_detail_page.dart';
 import 'maintenance_form_page.dart';
 
@@ -19,11 +21,31 @@ class MaintenanceListPage extends StatefulWidget {
 class _MaintenanceListPageState extends State<MaintenanceListPage> {
   List<Maintenance> _maintenances = [];
   bool _isLoading = true;
+  Vehicle? _vehicle;
 
   @override
   void initState() {
     super.initState();
     _loadMaintenances();
+    if (widget.vehicleId != null) {
+      _loadVehicle();
+    }
+  }
+
+  Future<void> _loadVehicle() async {
+    try {
+      final apiService = Provider.of<ApiService>(context, listen: false);
+      final response =
+          await apiService.getVehicle(widget.vehicleId.toString());
+
+      if (response.data['success'] == true && mounted) {
+        setState(() {
+          _vehicle = Vehicle.fromJson(response.data['data']);
+        });
+      }
+    } catch (_) {
+      // Cover photo fallback handled by widget.
+    }
   }
 
   Future<void> _loadMaintenances() async {
@@ -154,14 +176,9 @@ class _MaintenanceListPageState extends State<MaintenanceListPage> {
                       return Card(
                         margin: const EdgeInsets.only(bottom: 12),
                         child: ListTile(
-                          leading: CircleAvatar(
-                            backgroundColor:
-                                Theme.of(context).colorScheme.primary,
-                            child: Icon(
-                              _getMaintenanceTypeIcon(
-                                  maintenance.maintenanceType),
-                              color: Colors.white,
-                            ),
+                          leading: VehicleCoverAvatar(
+                            coverPhotoUrl: _vehicle?.coverPhotoUrl,
+                            size: 48,
                           ),
                           title: Text(
                             _getMaintenanceTypeLabel(
@@ -255,19 +272,6 @@ class _MaintenanceListPageState extends State<MaintenanceListPage> {
             )
           : null,
     );
-  }
-
-  IconData _getMaintenanceTypeIcon(String type) {
-    switch (type) {
-      case 'preventive':
-        return Icons.verified;
-      case 'corrective':
-        return Icons.build;
-      case 'inspection':
-        return Icons.search;
-      default:
-        return Icons.settings;
-    }
   }
 
   String _getMaintenanceTypeLabel(String type) {

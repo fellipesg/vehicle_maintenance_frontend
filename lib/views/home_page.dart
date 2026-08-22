@@ -3,7 +3,11 @@ import 'package:provider/provider.dart';
 import '../../services/auth_service.dart';
 import '../../services/api_service.dart';
 import '../../models/vehicle.dart';
-import 'auth/login_page.dart';
+import '../../widgets/user_avatar.dart';
+import '../../widgets/vehicle_cover_avatar.dart';
+import 'auth/login_hub_page.dart';
+import 'profile/profile_edit_page.dart';
+import 'profile/settings_page.dart';
 import 'vehicles/vehicle_form_page.dart';
 import 'vehicles/vehicle_detail_page.dart';
 
@@ -161,9 +165,9 @@ class _VehiclesPageState extends State<VehiclesPage> {
             return Card(
               margin: const EdgeInsets.only(bottom: 12),
               child: ListTile(
-                leading: CircleAvatar(
-                  backgroundColor: Theme.of(context).colorScheme.primary,
-                  child: const Icon(Icons.directions_car, color: Colors.white),
+                leading: VehicleCoverAvatar(
+                  coverPhotoUrl: vehicle.coverPhotoUrl,
+                  size: 48,
                 ),
                 title: Text(
                   vehicle.displayName,
@@ -218,8 +222,21 @@ class _VehiclesPageState extends State<VehiclesPage> {
   }
 }
 
-class ProfilePage extends StatelessWidget {
+class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
+
+  @override
+  State<ProfilePage> createState() => _ProfilePageState();
+}
+
+class _ProfilePageState extends State<ProfilePage> {
+  Future<void> _refreshUser() async {
+    final authService = Provider.of<AuthService>(context, listen: false);
+    await authService.getCurrentUser();
+    if (mounted) {
+      setState(() {});
+    }
+  }
 
   Future<void> _handleLogout(BuildContext context) async {
     final authService = Provider.of<AuthService>(context, listen: false);
@@ -227,7 +244,7 @@ class ProfilePage extends StatelessWidget {
 
     if (context.mounted) {
       Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (_) => const LoginPage()),
+        MaterialPageRoute(builder: (_) => const LoginHubPage()),
         (route) => false,
       );
     }
@@ -246,13 +263,9 @@ class ProfilePage extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const SizedBox(height: 24),
-              CircleAvatar(
-                radius: 50,
-                backgroundColor: Theme.of(context).colorScheme.primary,
-                child: Text(
-                  user?['name']?.substring(0, 1).toUpperCase() ?? 'U',
-                  style: const TextStyle(fontSize: 36, color: Colors.white),
-                ),
+              UserAvatar(
+                name: user?['name']?.toString(),
+                avatarUrl: user?['avatar_url']?.toString(),
               ),
               const SizedBox(height: 24),
               Text(
@@ -276,8 +289,15 @@ class ProfilePage extends StatelessWidget {
                   leading: const Icon(Icons.person),
                   title: const Text('Meus Dados'),
                   trailing: const Icon(Icons.chevron_right),
-                  onTap: () {
-                    // TODO: Navigate to profile edit page
+                  onTap: () async {
+                    final result = await Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const ProfileEditPage(),
+                      ),
+                    );
+                    if (result == true) {
+                      await _refreshUser();
+                    }
                   },
                 ),
               ),
@@ -288,7 +308,11 @@ class ProfilePage extends StatelessWidget {
                   title: const Text('Configurações'),
                   trailing: const Icon(Icons.chevron_right),
                   onTap: () {
-                    // TODO: Navigate to settings page
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const SettingsPage(),
+                      ),
+                    );
                   },
                 ),
               ),

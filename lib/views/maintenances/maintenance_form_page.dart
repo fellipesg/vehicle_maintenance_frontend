@@ -34,6 +34,7 @@ class _MaintenanceFormPageState extends State<MaintenanceFormPage> {
   DateTime _maintenanceDate = DateTime.now();
   bool _isManufacturerRequired = false;
   bool _isLoading = false;
+  int? _minKilometers;
   List<MaintenanceItem> _items = [];
   List<String> _invoiceFiles = [];
   Workshop? _selectedWorkshop;
@@ -68,10 +69,33 @@ class _MaintenanceFormPageState extends State<MaintenanceFormPage> {
       _isManufacturerRequired =
           widget.maintenance!.isManufacturerRequired ?? false;
       _items = widget.maintenance!.items ?? [];
-      // Load workshop if exists
       if (widget.maintenance!.workshopId != null) {
         _loadWorkshop(widget.maintenance!.workshopId!);
       }
+    }
+
+    _loadVehicleKilometers();
+  }
+
+  Future<void> _loadVehicleKilometers() async {
+    try {
+      final apiService = Provider.of<ApiService>(context, listen: false);
+      final response =
+          await apiService.getVehicle(widget.vehicleId.toString());
+
+      if (response.data['success'] == true && mounted) {
+        final currentKm = response.data['data']['current_kilometers'];
+        setState(() {
+          _minKilometers = currentKm is int ? currentKm : int.tryParse('$currentKm');
+          if (widget.maintenance == null &&
+              _kilometersController.text.isEmpty &&
+              _minKilometers != null) {
+            _kilometersController.text = _minKilometers.toString();
+          }
+        });
+      }
+    } catch (_) {
+      // Keep form usable even if vehicle fetch fails.
     }
   }
 
@@ -225,9 +249,7 @@ class _MaintenanceFormPageState extends State<MaintenanceFormPage> {
             ? null
             : _workshopNameController.text.trim(),
         'maintenance_date': _maintenanceDate.toIso8601String().split('T')[0],
-        'kilometers': _kilometersController.text.trim().isEmpty
-            ? null
-            : int.tryParse(_kilometersController.text.trim()),
+        'kilometers': int.parse(_kilometersController.text.trim()),
         'service_category': _serviceCategory!,
         'is_manufacturer_required': _isManufacturerRequired
             ? 1
@@ -271,9 +293,7 @@ class _MaintenanceFormPageState extends State<MaintenanceFormPage> {
               ? null
               : _workshopNameController.text.trim(),
           'maintenance_date': _maintenanceDate.toIso8601String().split('T')[0],
-          'kilometers': _kilometersController.text.trim().isEmpty
-              ? null
-              : int.tryParse(_kilometersController.text.trim()),
+          'kilometers': int.parse(_kilometersController.text.trim()),
           'service_category': _serviceCategory!,
           'is_manufacturer_required': _isManufacturerRequired,
           'items': _items.map((item) => item.toJson()).toList(),
@@ -372,12 +392,28 @@ class _MaintenanceFormPageState extends State<MaintenanceFormPage> {
                 const SizedBox(height: 16),
                 TextFormField(
                   controller: _kilometersController,
-                  decoration: const InputDecoration(
-                    labelText: 'Quilometragem',
-                    prefixIcon: Icon(Icons.speed),
-                    border: OutlineInputBorder(),
+                  decoration: InputDecoration(
+                    labelText: 'Quilometragem *',
+                    prefixIcon: const Icon(Icons.speed),
+                    border: const OutlineInputBorder(),
+                    helperText: _minKilometers == null
+                        ? 'Informe o hodômetro nesta manutenção.'
+                        : 'Hodômetro atual: $_minKilometers km. Informe um valor igual ou maior.',
                   ),
                   keyboardType: TextInputType.number,
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'Informe a quilometragem';
+                    }
+                    final km = int.tryParse(value.trim());
+                    if (km == null || km < 0) {
+                      return 'Quilometragem inválida';
+                    }
+                    if (_minKilometers != null && km < _minKilometers!) {
+                      return 'A quilometragem deve ser no mínimo $_minKilometers km';
+                    }
+                    return null;
+                  },
                 ),
                 const SizedBox(height: 16),
                 DropdownButtonFormField<String>(

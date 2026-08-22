@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:dio/dio.dart';
 import 'package:path_provider/path_provider.dart';
@@ -6,6 +7,8 @@ import 'package:url_launcher/url_launcher.dart';
 import 'dart:io';
 import '../../models/vehicle.dart';
 import '../../services/api_service.dart';
+import '../../widgets/vehicle_cover_avatar.dart';
+import '../../widgets/vehicle_maintenance_timeline.dart';
 import 'vehicle_form_page.dart';
 import '../maintenances/maintenance_form_page.dart';
 import '../maintenances/maintenance_list_page.dart';
@@ -23,6 +26,7 @@ class _VehicleDetailPageState extends State<VehicleDetailPage> {
   Vehicle? _vehicle;
   bool _isLoading = true;
   int _maintenanceCount = 0;
+  Map<String, dynamic>? _timeline;
 
   @override
   void initState() {
@@ -34,11 +38,16 @@ class _VehicleDetailPageState extends State<VehicleDetailPage> {
     try {
       final apiService = Provider.of<ApiService>(context, listen: false);
       final response = await apiService.getVehicle(widget.vehicleId.toString());
+      final timelineResponse =
+          await apiService.getVehicleTimeline(widget.vehicleId.toString());
 
       if (response.data['success'] == true && mounted) {
         setState(() {
           _vehicle = Vehicle.fromJson(response.data['data']);
           _maintenanceCount = _vehicle?.maintenances?.length ?? 0;
+          if (timelineResponse.data['success'] == true) {
+            _timeline = Map<String, dynamic>.from(timelineResponse.data['data']);
+          }
           _isLoading = false;
         });
       }
@@ -253,10 +262,10 @@ class _VehicleDetailPageState extends State<VehicleDetailPage> {
                     children: [
                       Row(
                         children: [
-                          Icon(
-                            Icons.directions_car,
-                            size: 48,
-                            color: Theme.of(context).colorScheme.primary,
+                          VehicleCoverAvatar(
+                            coverPhotoUrl: _vehicle!.coverPhotoUrl,
+                            size: 72,
+                            borderRadius: 12,
                           ),
                           const SizedBox(width: 16),
                           Expanded(
@@ -288,10 +297,25 @@ class _VehicleDetailPageState extends State<VehicleDetailPage> {
                         _buildInfoRow('Chassi', _vehicle!.chassis!),
                       if (_vehicle!.engine != null)
                         _buildInfoRow('Motor', _vehicle!.engine!),
+                      if (_vehicle!.currentKilometers != null)
+                        _buildInfoRow(
+                          'Quilometragem atual',
+                          '${NumberFormat.decimalPattern('pt_BR').format(_vehicle!.currentKilometers)} km',
+                        ),
+                      if (_timeline?['summary']?['approximate_annual_kilometers'] != null)
+                        _buildInfoRow(
+                          'Média aprox. por ano',
+                          '~${NumberFormat.decimalPattern('pt_BR').format(_timeline!['summary']['approximate_annual_kilometers'])} km/ano',
+                          subtitle: 'Estimativa com base no cadastro e nas manutenções.',
+                        ),
                     ],
                   ),
                 ),
               ),
+              if (_timeline != null) ...[
+                const SizedBox(height: 16),
+                VehicleMaintenanceTimeline(timeline: _timeline!),
+              ],
               const SizedBox(height: 16),
               Card(
                 child: Column(
@@ -355,7 +379,7 @@ class _VehicleDetailPageState extends State<VehicleDetailPage> {
     );
   }
 
-  Widget _buildInfoRow(String label, String value) {
+  Widget _buildInfoRow(String label, String value, {String? subtitle}) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
@@ -372,9 +396,22 @@ class _VehicleDetailPageState extends State<VehicleDetailPage> {
             ),
           ),
           Expanded(
-            child: Text(
-              value,
-              style: const TextStyle(fontSize: 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  value,
+                  style: const TextStyle(fontSize: 16),
+                ),
+                if (subtitle != null)
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey.shade600,
+                    ),
+                  ),
+              ],
             ),
           ),
         ],

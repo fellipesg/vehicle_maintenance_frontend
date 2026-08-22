@@ -1,18 +1,27 @@
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:url_launcher/url_launcher.dart';
-import 'package:flutter/material.dart';
-import 'api_service.dart';
-import 'fcm_service.dart';
 import 'dart:convert';
+import 'dart:io';
+
+import 'package:dio/dio.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+import '../models/login_result.dart';
+import 'api_service.dart';
+import 'auth_token_storage.dart';
+import 'fcm_service.dart';
 
 class AuthService {
   final ApiService _apiService;
+  final AuthTokenStorage _tokenStorage;
   FcmService? _fcmService;
-  static const String _tokenKey = 'auth_token';
+  static const String _legacyTokenKey = SecureAuthTokenStorage.tokenKey;
   static const String _userKey = 'user_data';
 
-  AuthService(this._apiService) {
-    _fcmService = FcmService(_apiService);
+  AuthService(
+    this._apiService, {
+    AuthTokenStorage? tokenStorage,
+    FcmService? fcmService,
+  })  : _tokenStorage = tokenStorage ?? SecureAuthTokenStorage() {
+    _fcmService = fcmService ?? FcmService(_apiService);
   }
 
   // Expose _apiService for OAuth callback handling
@@ -27,8 +36,7 @@ class AuthService {
 
   Future<void> _saveToken(String token) async {
     _token = token;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_tokenKey, token);
+    await _tokenStorage.writeToken(token);
     _apiService.setAuthToken(token);
   }
 
@@ -42,9 +50,21 @@ class AuthService {
     await prefs.setString(_userKey, jsonEncode(user));
   }
 
+  Future<void> _migrateLegacyTokenIfNeeded(SharedPreferences prefs) async {
+    final legacyToken = prefs.getString(_legacyTokenKey);
+    if (legacyToken == null) {
+      return;
+    }
+
+    await _tokenStorage.writeToken(legacyToken);
+    await prefs.remove(_legacyTokenKey);
+  }
+
   Future<void> loadStoredAuth() async {
     final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString(_tokenKey);
+    await _migrateLegacyTokenIfNeeded(prefs);
+
+    final token = await _tokenStorage.readToken();
     final userStr = prefs.getString(_userKey);
 
     if (token != null) {
@@ -64,6 +84,7 @@ class AuthService {
     required String name,
     required String email,
     required String password,
+    String userType = 'user',
     String? phone,
     String? postalCode,
     String? street,
@@ -81,6 +102,7 @@ class AuthService {
           'email': email,
           'password': password,
           'password_confirmation': password,
+          'user_type': userType,
           'phone': phone,
           'postal_code': postalCode,
           'street': street,
@@ -109,31 +131,85 @@ class AuthService {
     }
   }
 
-  Future<bool> login(String email, String password) async {
+  Future<LoginResult> login(String email, String password,
+      {String? portal}) async {
     try {
       final response = await _apiService.dio.post(
         '/login',
         data: {
           'email': email,
           'password': password,
+          if (portal != null) 'portal': portal,
         },
       );
 
-      if (response.data['success'] == true) {
-        final token = response.data['data']['token'];
-        final user = response.data['data']['user'];
-        await _saveToken(token);
-        await _saveUser(user);
-
-        // Register FCM token after successful login
-        _fcmService?.registerTokenAfterAuth();
-
-        return true;
-      }
-      return false;
+      return _parseAuthResponse(response.data);
+    } on DioException catch (e) {
+      final message = e.response?.data is Map
+          ? e.response?.data['message']?.toString()
+          : null;
+      throw Exception(message ?? 'Erro ao fazer login');
     } catch (e) {
       throw Exception('Erro ao fazer login: $e');
     }
+  }
+
+  Future<bool> completeTwoFactorChallenge({
+    required String challengeToken,
+    String? code,
+    String? recoveryCode,
+  }) async {
+    try {
+      final response = await _apiService.dio.post(
+        '/two-factor/challenge',
+        data: {
+          'challenge_token': challengeToken,
+          if (code != null) 'code': code,
+          if (recoveryCode != null) 'recovery_code': recoveryCode,
+        },
+      );
+
+      final result = await _parseAuthResponse(response.data);
+      return result is LoginSuccess;
+    } on DioException catch (e) {
+      final message = e.response?.data is Map
+          ? e.response?.data['message']?.toString()
+          : null;
+      throw Exception(message ?? 'Código de verificação inválido');
+    } catch (e) {
+      throw Exception('Erro ao verificar autenticação em duas etapas: $e');
+    }
+  }
+
+  Future<LoginResult> _parseAuthResponse(dynamic data) async {
+    if (data is! Map) {
+      return const LoginFailure();
+    }
+
+    if (data['success'] != true) {
+      return const LoginFailure();
+    }
+
+    if (data['requires_two_factor'] == true) {
+      final challengeToken = data['challenge_token']?.toString();
+      if (challengeToken == null || challengeToken.isEmpty) {
+        return const LoginFailure();
+      }
+
+      return LoginNeedsTwoFactor(challengeToken: challengeToken);
+    }
+
+    final tokenData = data['data'];
+    if (tokenData is! Map || tokenData['token'] == null) {
+      return const LoginFailure();
+    }
+
+    await _saveToken(tokenData['token'].toString());
+    await _saveUser(Map<String, dynamic>.from(tokenData['user'] as Map));
+
+    _fcmService?.registerTokenAfterAuth();
+
+    return const LoginSuccess();
   }
 
   Future<String?> getOAuthRedirectUrl(String provider,
@@ -178,7 +254,7 @@ class AuthService {
     return redirectUrl != null;
   }
 
-  Future<void> processOAuthCallback(
+  Future<LoginResult> processOAuthCallback(
       String provider, Map<String, String> queryParams) async {
     try {
       // Build the callback URL with query parameters
@@ -195,17 +271,15 @@ class AuthService {
       // Note: We need to use the full URL path with query parameters
       final response = await _apiService.dio.get(callbackUrl);
 
-      if (response.data['success'] == true) {
-        final token = response.data['data']['token'];
-        final user = response.data['data']['user'];
-        await _saveToken(token);
-        await _saveUser(user);
-
-        // Register FCM token after successful OAuth login
-        _fcmService?.registerTokenAfterAuth();
-      } else {
-        throw Exception(response.data['message'] ?? 'Erro ao processar login');
+      final result = await _parseAuthResponse(response.data);
+      if (result is LoginFailure) {
+        final message = response.data is Map
+            ? response.data['message']?.toString()
+            : null;
+        throw Exception(message ?? 'Erro ao processar login');
       }
+
+      return result;
     } catch (e) {
       throw Exception('Erro ao processar callback OAuth: $e');
     }
@@ -225,7 +299,8 @@ class AuthService {
       _token = null;
       _user = null;
       final prefs = await SharedPreferences.getInstance();
-      await prefs.remove(_tokenKey);
+      await _tokenStorage.deleteToken();
+      await prefs.remove(_legacyTokenKey);
       await prefs.remove(_userKey);
       _apiService.setAuthToken(null);
     }
@@ -246,6 +321,73 @@ class AuthService {
       return null;
     } catch (e) {
       return _user;
+    }
+  }
+
+  Future<bool> updateProfile({
+    required String name,
+    String? phone,
+    String? postalCode,
+    String? street,
+    String? number,
+    String? complement,
+    String? city,
+    String? state,
+    String? country,
+  }) async {
+    try {
+      final response = await _apiService.updateProfile({
+        'name': name,
+        'phone': phone,
+        'postal_code': postalCode,
+        'street': street,
+        'number': number,
+        'complement': complement,
+        'city': city,
+        'state': state,
+        'country': country,
+      });
+
+      if (response.data['success'] == true) {
+        await _saveUser(Map<String, dynamic>.from(response.data['data'] as Map));
+        return true;
+      }
+
+      return false;
+    } on DioException catch (e) {
+      final message = e.response?.data is Map
+          ? e.response?.data['message']?.toString()
+          : null;
+      throw Exception(message ?? 'Erro ao atualizar perfil');
+    } catch (e) {
+      throw Exception('Erro ao atualizar perfil: $e');
+    }
+  }
+
+  Future<bool> uploadAvatar(File file) async {
+    try {
+      final response = await _apiService.uploadAvatar(file);
+
+      if (response.data['success'] == true) {
+        final userData = response.data['data'];
+        if (userData is Map) {
+          await _saveUser(Map<String, dynamic>.from(userData));
+        } else if (_user != null && response.data['avatar_url'] != null) {
+          final updatedUser = Map<String, dynamic>.from(_user!);
+          updatedUser['avatar_url'] = response.data['avatar_url'];
+          await _saveUser(updatedUser);
+        }
+        return true;
+      }
+
+      return false;
+    } on DioException catch (e) {
+      final message = e.response?.data is Map
+          ? e.response?.data['message']?.toString()
+          : null;
+      throw Exception(message ?? 'Erro ao enviar foto');
+    } catch (e) {
+      throw Exception('Erro ao enviar foto: $e');
     }
   }
 }

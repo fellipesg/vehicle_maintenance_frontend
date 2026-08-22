@@ -2,13 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../home_page.dart';
-import '../../services/api_service.dart';
+import '../../models/login_portal.dart';
+import '../../models/login_result.dart';
 import '../../services/auth_service.dart';
-import 'register_page.dart';
 import 'oauth_webview_page.dart';
+import 'register_page.dart';
+import 'two_factor_challenge_page.dart';
 
 class LoginPage extends StatefulWidget {
-  const LoginPage({super.key});
+  const LoginPage({super.key, this.portal = LoginPortal.usuario});
+
+  final LoginPortal portal;
 
   @override
   State<LoginPage> createState() => _LoginPageState();
@@ -20,6 +24,8 @@ class _LoginPageState extends State<LoginPage> {
   final _passwordController = TextEditingController();
   bool _isLoading = false;
   bool _obscurePassword = true;
+
+  LoginPortal get _portal => widget.portal;
 
   @override
   void dispose() {
@@ -39,28 +45,44 @@ class _LoginPageState extends State<LoginPage> {
 
     try {
       final authService = Provider.of<AuthService>(context, listen: false);
-      final success = await authService.login(
+      final result = await authService.login(
         _emailController.text.trim(),
         _passwordController.text,
+        portal: _portal.apiValue,
       );
 
-      if (success && mounted) {
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => const HomePage()),
-        );
-      } else if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Erro ao fazer login. Verifique suas credenciais.'),
-            backgroundColor: Colors.red,
-          ),
-        );
+      if (!mounted) {
+        return;
+      }
+
+      switch (result) {
+        case LoginSuccess():
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(builder: (_) => const HomePage()),
+            (route) => false,
+          );
+        case LoginNeedsTwoFactor(:final challengeToken):
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => TwoFactorChallengePage(
+                challengeToken: challengeToken,
+              ),
+            ),
+          );
+        case LoginFailure():
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content:
+                  Text('Erro ao fazer login. Verifique suas credenciais.'),
+              backgroundColor: Colors.red,
+            ),
+          );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Erro: $e'),
+            content: Text(_friendlyError(e)),
             backgroundColor: Colors.red,
           ),
         );
@@ -74,6 +96,17 @@ class _LoginPageState extends State<LoginPage> {
     }
   }
 
+  String _friendlyError(Object e) {
+    final raw = e.toString().replaceFirst('Exception: ', '');
+    if (raw.contains('Este portal') || raw.contains('acesso a este portal')) {
+      return 'Esta conta não tem acesso a este portal.';
+    }
+    if (raw.contains('401') || raw.contains('Invalid login')) {
+      return 'Credenciais inválidas.';
+    }
+    return raw;
+  }
+
   Future<void> _handleSSOLogin(String provider) async {
     setState(() {
       _isLoading = true;
@@ -81,17 +114,13 @@ class _LoginPageState extends State<LoginPage> {
 
     try {
       final authService = Provider.of<AuthService>(context, listen: false);
-      // Force account selection to allow users to choose a different account
       final redirectUrl = await authService.getOAuthRedirectUrl(provider,
           forceAccountSelection: true);
 
       if (redirectUrl != null && mounted) {
-        // Try to open in native browser first (preferred method)
-        // This is required by Google's security policy
         final uri = Uri.parse(redirectUrl);
         bool useNativeBrowser = false;
 
-        // Try to launch in native browser
         if (await canLaunchUrl(uri)) {
           try {
             await launchUrl(
@@ -100,27 +129,23 @@ class _LoginPageState extends State<LoginPage> {
             );
             useNativeBrowser = true;
 
-            // Show message to user
             if (mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
+                const SnackBar(
                   content: Text(
                     'Por favor, complete o login no navegador. '
                     'Você será redirecionado de volta ao app após o login.',
                   ),
-                  duration: const Duration(seconds: 5),
+                  duration: Duration(seconds: 5),
                   backgroundColor: Colors.blue,
                 ),
               );
             }
-          } catch (e) {
-            // If native browser fails, fall back to WebView with custom User-Agent
+          } catch (_) {
             useNativeBrowser = false;
           }
         }
 
-        // Fallback: Use WebView with custom User-Agent if native browser is not available
-        // This simulates a real browser to bypass Google's restrictions
         if (!useNativeBrowser && mounted) {
           Navigator.of(context).push(
             MaterialPageRoute(
@@ -152,7 +177,12 @@ class _LoginPageState extends State<LoginPage> {
 
   @override
   Widget build(BuildContext context) {
+    final accent = _portal.accent;
+
     return Scaffold(
+      appBar: AppBar(
+        title: const Text('Entrar'),
+      ),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24.0),
@@ -161,29 +191,35 @@ class _LoginPageState extends State<LoginPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const SizedBox(height: 40),
-                Icon(
-                  Icons.directions_car,
-                  size: 80,
-                  color: Theme.of(context).colorScheme.primary,
+                const SizedBox(height: 8),
+                Center(
+                  child: Container(
+                    width: 64,
+                    height: 64,
+                    decoration: BoxDecoration(
+                      color: accent.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Icon(_portal.icon, size: 32, color: accent),
+                  ),
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 16),
                 Text(
-                  'Vehicle Maintenance',
-                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                  _portal.title,
+                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                         fontWeight: FontWeight.bold,
                       ),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Faça login para continuar',
-                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                  _portal.subtitle,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                         color: Colors.grey.shade600,
                       ),
                   textAlign: TextAlign.center,
                 ),
-                const SizedBox(height: 40),
+                const SizedBox(height: 32),
                 TextFormField(
                   controller: _emailController,
                   keyboardType: TextInputType.emailAddress,
@@ -232,85 +268,88 @@ class _LoginPageState extends State<LoginPage> {
                 ),
                 const SizedBox(height: 24),
                 ElevatedButton(
+                  key: const Key('login_submit_button'),
                   onPressed: _isLoading ? null : _handleLogin,
                   style: ElevatedButton.styleFrom(
+                    backgroundColor: accent,
+                    foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 16),
                   ),
                   child: _isLoading
                       ? const SizedBox(
                           height: 20,
                           width: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2),
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
                         )
                       : const Text('Entrar'),
                 ),
-                const SizedBox(height: 24),
-                Row(
-                  children: [
-                    Expanded(child: Divider(color: Colors.grey.shade300)),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: Text(
-                        'OU',
-                        style: TextStyle(color: Colors.grey.shade600),
+                if (_portal != LoginPortal.admin) ...[
+                  const SizedBox(height: 24),
+                  Row(
+                    children: [
+                      Expanded(child: Divider(color: Colors.grey.shade300)),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: Text(
+                          'OU',
+                          style: TextStyle(color: Colors.grey.shade600),
+                        ),
                       ),
+                      Expanded(child: Divider(color: Colors.grey.shade300)),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+                  OutlinedButton.icon(
+                    onPressed:
+                        _isLoading ? null : () => _handleSSOLogin('google'),
+                    icon: const Icon(Icons.g_mobiledata, size: 28),
+                    label: const Text('Continuar com Google'),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
                     ),
-                    Expanded(child: Divider(color: Colors.grey.shade300)),
-                  ],
-                ),
+                  ),
+                  const SizedBox(height: 12),
+                  OutlinedButton.icon(
+                    onPressed:
+                        _isLoading ? null : () => _handleSSOLogin('facebook'),
+                    icon: const Icon(Icons.facebook, size: 28),
+                    label: const Text('Continuar com Facebook'),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  OutlinedButton.icon(
+                    onPressed:
+                        _isLoading ? null : () => _handleSSOLogin('twitter'),
+                    icon: const Icon(Icons.alternate_email, size: 28),
+                    label: const Text('Continuar com Twitter/X'),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 24),
-                OutlinedButton.icon(
-                  onPressed:
-                      _isLoading ? null : () => _handleSSOLogin('google'),
-                  icon: const Icon(Icons.g_mobiledata, size: 28),
-                  label: const Text('Continuar com Google'),
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                OutlinedButton.icon(
-                  onPressed:
-                      _isLoading ? null : () => _handleSSOLogin('facebook'),
-                  icon: const Icon(Icons.facebook, size: 28),
-                  label: const Text('Continuar com Facebook'),
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                OutlinedButton.icon(
-                  onPressed:
-                      _isLoading ? null : () => _handleSSOLogin('twitter'),
-                  icon: const Icon(Icons.alternate_email, size: 28),
-                  label: const Text('Continuar com Twitter/X'),
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                  ),
-                ),
-                const SizedBox(height: 32),
                 TextButton(
-                  onPressed: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => const RegisterPage()),
-                    );
-                  },
-                  child: RichText(
-                    text: TextSpan(
-                      style: TextStyle(color: Colors.grey.shade700),
-                      children: const [
-                        TextSpan(text: 'Não tem uma conta? '),
-                        TextSpan(
-                          text: 'Cadastre-se',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            color: Colors.blue,
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('← Outros tipos de acesso'),
+                ),
+                if (_portal.canRegister)
+                  TextButton(
+                    onPressed: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => RegisterPage(
+                            userType: _portal.registerUserType,
                           ),
                         ),
-                      ],
-                    ),
+                      );
+                    },
+                    child: Text(_portal.registerCta),
                   ),
-                ),
               ],
             ),
           ),

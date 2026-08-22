@@ -1,3 +1,4 @@
+import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:io';
@@ -5,19 +6,24 @@ import 'api_service.dart';
 
 class FcmService {
   final ApiService _apiService;
-  final FirebaseMessaging _firebaseMessaging = FirebaseMessaging.instance;
+  final FirebaseMessaging? _firebaseMessaging;
   static const String _tokenKey = 'fcm_token_registered';
 
-  FcmService(this._apiService);
+  FcmService(this._apiService)
+      : _firebaseMessaging =
+            Firebase.apps.isEmpty ? null : FirebaseMessaging.instance;
 
   /// Initialize FCM and request permissions
   Future<void> initialize() async {
+    final messaging = _firebaseMessaging;
+    if (messaging == null) {
+      return;
+    }
     try {
       print('🔔 Inicializando FCM...');
 
       // Request permission for notifications
-      NotificationSettings settings =
-          await _firebaseMessaging.requestPermission(
+      NotificationSettings settings = await messaging.requestPermission(
         alert: true,
         badge: true,
         sound: true,
@@ -28,8 +34,12 @@ class FcmService {
 
       if (settings.authorizationStatus == AuthorizationStatus.authorized ||
           settings.authorizationStatus == AuthorizationStatus.provisional) {
+        if (Platform.isIOS) {
+          await _waitForApnsToken(messaging);
+        }
+
         // Get FCM token
-        String? token = await _firebaseMessaging.getToken();
+        String? token = await messaging.getToken();
         print(
             '🔔 Token FCM obtido: ${token != null ? token.substring(0, 50) + "..." : "null"}');
 
@@ -40,7 +50,7 @@ class FcmService {
         }
 
         // Listen for token refresh
-        _firebaseMessaging.onTokenRefresh.listen((newToken) {
+        messaging.onTokenRefresh.listen((newToken) {
           print('🔄 Token FCM atualizado, registrando novamente...');
           _registerToken(newToken);
         });
@@ -52,6 +62,20 @@ class FcmService {
       print('❌ Erro ao inicializar FCM: $e');
       print('Stack trace: $stackTrace');
     }
+  }
+
+  Future<void> _waitForApnsToken(FirebaseMessaging messaging) async {
+    for (var attempt = 0; attempt < 10; attempt++) {
+      final apnsToken = await messaging.getAPNSToken();
+      if (apnsToken != null) {
+        print('🔔 APNS token disponível.');
+        return;
+      }
+
+      await Future.delayed(const Duration(seconds: 1));
+    }
+
+    print('⚠️ APNS token ainda indisponível após aguardar.');
   }
 
   /// Register FCM token with backend

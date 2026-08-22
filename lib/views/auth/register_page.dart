@@ -4,7 +4,9 @@ import '../home_page.dart';
 import '../../services/auth_service.dart';
 
 class RegisterPage extends StatefulWidget {
-  const RegisterPage({super.key});
+  const RegisterPage({super.key, this.userType = 'user'});
+
+  final String userType;
 
   @override
   State<RegisterPage> createState() => _RegisterPageState();
@@ -61,6 +63,7 @@ class _RegisterPageState extends State<RegisterPage> {
         name: _nameController.text.trim(),
         email: _emailController.text.trim(),
         password: _passwordController.text,
+        userType: widget.userType,
         phone: _phoneController.text.trim(),
         postalCode: _postalCodeController.text.trim(),
         street: _streetController.text.trim(),
@@ -116,14 +119,18 @@ class _RegisterPageState extends State<RegisterPage> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Text(
-                  'Criar Conta',
+                  widget.userType == 'garage'
+                      ? 'Cadastre sua loja'
+                      : 'Criar Conta',
                   style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                         fontWeight: FontWeight.bold,
                       ),
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Preencha os dados para criar sua conta',
+                  widget.userType == 'garage'
+                      ? 'Conta de lojista / garagem'
+                      : 'Conta de proprietário de veículo',
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                         color: Colors.grey.shade600,
                       ),

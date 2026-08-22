@@ -1,12 +1,18 @@
+import 'dart:io';
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
+import 'package:open_filex/open_filex.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
-import 'package:printing/printing.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../models/maintenance.dart';
 import '../../models/maintenance_item.dart';
 import '../../models/invoice.dart';
+import '../../models/vehicle.dart';
 import '../../services/api_service.dart';
+import '../../widgets/vehicle_cover_avatar.dart';
 import 'maintenance_form_page.dart';
 
 class MaintenanceDetailPage extends StatefulWidget {
@@ -20,6 +26,7 @@ class MaintenanceDetailPage extends StatefulWidget {
 
 class _MaintenanceDetailPageState extends State<MaintenanceDetailPage> {
   Maintenance? _maintenance;
+  Vehicle? _vehicle;
   bool _isLoading = true;
 
   @override
@@ -35,10 +42,12 @@ class _MaintenanceDetailPageState extends State<MaintenanceDetailPage> {
           await apiService.getMaintenance(widget.maintenanceId.toString());
 
       if (response.data['success'] == true && mounted) {
+        final maintenance = Maintenance.fromJson(response.data['data']);
         setState(() {
-          _maintenance = Maintenance.fromJson(response.data['data']);
+          _maintenance = maintenance;
           _isLoading = false;
         });
+        await _loadVehicle(maintenance.vehicleId);
       }
     } catch (e) {
       if (mounted) {
@@ -52,6 +61,21 @@ class _MaintenanceDetailPageState extends State<MaintenanceDetailPage> {
           ),
         );
       }
+    }
+  }
+
+  Future<void> _loadVehicle(int vehicleId) async {
+    try {
+      final apiService = Provider.of<ApiService>(context, listen: false);
+      final response = await apiService.getVehicle(vehicleId.toString());
+
+      if (response.data['success'] == true && mounted) {
+        setState(() {
+          _vehicle = Vehicle.fromJson(response.data['data']);
+        });
+      }
+    } catch (_) {
+      // Cover photo fallback handled by widget.
     }
   }
 
@@ -94,19 +118,28 @@ class _MaintenanceDetailPageState extends State<MaintenanceDetailPage> {
         );
       }
 
-      // Download the file using the API service
       final response = await apiService.downloadInvoice(invoice.id.toString());
 
-      // Close loading snackbar
       if (mounted && messenger != null) {
         messenger.hideCurrentSnackBar();
       }
 
-      // Open the PDF using printing package (better for Android)
-      // This opens a native PDF viewer
-      if (mounted) {
-        await Printing.layoutPdf(
-          onLayout: (format) async => response.data,
+      final bytes = Uint8List.fromList(List<int>.from(response.data as List<int>));
+      final dir = await getTemporaryDirectory();
+      final file = File('${dir.path}/${_safePdfFileName(invoice)}');
+      await file.writeAsBytes(bytes, flush: true);
+
+      final result = await OpenFilex.open(file.path, type: 'application/pdf');
+      if (result.type != ResultType.done && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              result.message.isNotEmpty
+                  ? result.message
+                  : 'Não foi possível abrir o PDF neste aparelho.',
+            ),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     } catch (e) {
@@ -166,11 +199,15 @@ class _MaintenanceDetailPageState extends State<MaintenanceDetailPage> {
       ),
       body: RefreshIndicator(
         onRefresh: _loadMaintenance,
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
+        child: CustomScrollView(
+          physics: const AlwaysScrollableScrollPhysics(
+            parent: BouncingScrollPhysics(),
+          ),
+          slivers: [
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 48),
+              sliver: SliverList(
+                delegate: SliverChildListDelegate([
               Card(
                 child: Padding(
                   padding: const EdgeInsets.all(16),
@@ -179,11 +216,10 @@ class _MaintenanceDetailPageState extends State<MaintenanceDetailPage> {
                     children: [
                       Row(
                         children: [
-                          Icon(
-                            _getMaintenanceTypeIcon(
-                                _maintenance!.maintenanceType),
-                            size: 48,
-                            color: Theme.of(context).colorScheme.primary,
+                          VehicleCoverAvatar(
+                            coverPhotoUrl: _vehicle?.coverPhotoUrl,
+                            size: 72,
+                            borderRadius: 12,
                           ),
                           const SizedBox(width: 16),
                           Expanded(
@@ -320,11 +356,76 @@ class _MaintenanceDetailPageState extends State<MaintenanceDetailPage> {
                   ),
                 ),
               ],
-            ],
-          ),
+            ]),
+              ),
+            ),
+          ],
         ),
       ),
     );
+  }
+
+  String _safePdfFileName(Invoice invoice) {
+    final raw = invoice.fileName.trim();
+    final base = raw.isEmpty
+        ? 'nota-${invoice.id ?? 'fiscal'}'
+        : raw.replaceAll(RegExp(r'[/\\]'), '_');
+    return base.toLowerCase().endsWith('.pdf') ? base : '$base.pdf';
+  }
+
+  String _normalizeBrWhatsapp(String raw) {
+    var digits = raw.replaceAll(RegExp(r'\D'), '');
+    if (digits.startsWith('00')) {
+      digits = digits.substring(2);
+    }
+    if (digits.startsWith('0')) {
+      digits = digits.substring(1);
+    }
+    if (digits.startsWith('55') && digits.length >= 12) {
+      return digits;
+    }
+    return '55$digits';
+  }
+
+  Future<void> _openWhatsApp(String rawPhone) async {
+    final phone = _normalizeBrWhatsapp(rawPhone);
+    if (phone.length < 12) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Número de WhatsApp inválido.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      return;
+    }
+
+    final appUri = Uri.parse('whatsapp://send?phone=$phone');
+    final webUri = Uri.parse('https://wa.me/$phone');
+
+    try {
+      if (await canLaunchUrl(appUri)) {
+        final opened = await launchUrl(
+          appUri,
+          mode: LaunchMode.externalApplication,
+        );
+        if (opened) {
+          return;
+        }
+      }
+
+      await launchUrl(webUri, mode: LaunchMode.externalApplication);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Não foi possível abrir o WhatsApp: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   Widget _buildWorkshopSection() {
@@ -389,13 +490,7 @@ class _MaintenanceDetailPageState extends State<MaintenanceDetailPage> {
           // WhatsApp
           if (workshop.whatsapp != null)
             InkWell(
-              onTap: () async {
-                final phone = workshop.whatsapp!.replaceAll(RegExp(r'\D'), '');
-                final uri = Uri.parse('https://wa.me/55$phone');
-                if (await canLaunchUrl(uri)) {
-                  await launchUrl(uri, mode: LaunchMode.externalApplication);
-                }
-              },
+              onTap: () => _openWhatsApp(workshop.whatsapp!),
               child: Row(
                 children: [
                   const Icon(Icons.chat, size: 20),
@@ -566,19 +661,6 @@ class _MaintenanceDetailPageState extends State<MaintenanceDetailPage> {
         ],
       ),
     );
-  }
-
-  IconData _getMaintenanceTypeIcon(String type) {
-    switch (type) {
-      case 'preventive':
-        return Icons.verified;
-      case 'corrective':
-        return Icons.build;
-      case 'inspection':
-        return Icons.search;
-      default:
-        return Icons.settings;
-    }
   }
 
   String _getMaintenanceTypeLabel(String type) {

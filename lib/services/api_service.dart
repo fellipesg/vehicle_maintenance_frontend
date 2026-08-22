@@ -71,6 +71,14 @@ class ApiService {
     return await _dio.get('/vehicles/$vehicleId/export-pdf');
   }
 
+  Future<Response> getVehicleTimeline(String vehicleId) async {
+    return await _dio.get('/vehicles/$vehicleId/timeline');
+  }
+
+  Future<Response> getTermsOfUse() async {
+    return await _dio.get('/legal/terms-of-use');
+  }
+
   // Maintenance endpoints
   Future<Response> getMaintenances({Map<String, dynamic>? queryParams}) async {
     return await _dio.get('/maintenances', queryParameters: queryParams);
@@ -142,5 +150,40 @@ class ApiService {
 
   Future<Response> deleteWorkshop(String id) async {
     return await _dio.delete('/workshops/$id');
+  }
+
+  // Profile endpoints
+  Future<Response> updateProfile(Map<String, dynamic> data) async {
+    return await _dio.put('/me', data: data);
+  }
+
+  Future<Response> uploadAvatar(File file) async {
+    final formData = FormData.fromMap({
+      'avatar': await MultipartFile.fromFile(
+        file.path,
+        filename: file.path.split('/').last,
+      ),
+    });
+
+    return await _dio.post(
+      '/me/avatar',
+      data: formData,
+      options: Options(contentType: 'multipart/form-data'),
+    );
+  }
+
+  Future<Response> uploadVehicleCover(String vehicleId, File file) async {
+    final formData = FormData.fromMap({
+      'cover': await MultipartFile.fromFile(
+        file.path,
+        filename: file.path.split('/').last,
+      ),
+    });
+
+    return await _dio.post(
+      '/vehicles/$vehicleId/cover',
+      data: formData,
+      options: Options(contentType: 'multipart/form-data'),
+    );
   }
 }

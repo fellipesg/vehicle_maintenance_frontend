@@ -1,7 +1,14 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:dio/dio.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../models/vehicle.dart';
 import '../../services/api_service.dart';
+import '../../widgets/vehicle_cover_avatar.dart';
+import '../../widgets/cover_framing.dart';
+import '../../widgets/cover_image_cropper.dart';
+import '../../widgets/terms_scroll_acceptance.dart';
 import 'package:provider/provider.dart';
 
 class VehicleFormPage extends StatefulWidget {
@@ -23,7 +30,15 @@ class _VehicleFormPageState extends State<VehicleFormPage> {
   final _colorController = TextEditingController();
   final _chassisController = TextEditingController();
   final _engineController = TextEditingController();
+  final _kilometersController = TextEditingController();
   bool _isLoading = false;
+  bool _termsAccepted = false;
+  String _termsContent = '';
+  bool _loadingTerms = false;
+  final ImagePicker _picker = ImagePicker();
+  final CoverImageCropper _coverCropper = CoverImageCropper();
+  File? _coverFile;
+  String? _existingCoverUrl;
 
   @override
   void initState() {
@@ -37,6 +52,57 @@ class _VehicleFormPageState extends State<VehicleFormPage> {
       _colorController.text = widget.vehicle!.color ?? '';
       _chassisController.text = widget.vehicle!.chassis ?? '';
       _engineController.text = widget.vehicle!.engine ?? '';
+      _existingCoverUrl = widget.vehicle!.coverPhotoUrl;
+      if (widget.vehicle!.currentKilometers != null) {
+        _kilometersController.text =
+            widget.vehicle!.currentKilometers.toString();
+      }
+    } else {
+      _loadTerms();
+    }
+  }
+
+  Future<void> _loadTerms() async {
+    setState(() {
+      _loadingTerms = true;
+    });
+
+    try {
+      final apiService = Provider.of<ApiService>(context, listen: false);
+      final response = await apiService.getTermsOfUse();
+      if (response.data['success'] == true && mounted) {
+        setState(() {
+          _termsContent = response.data['data']['content']?.toString() ?? '';
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _termsContent =
+              'Ao cadastrar o veículo, você declara que as informações são verdadeiras e de sua responsabilidade.';
+        });
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _loadingTerms = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _pickCover() async {
+    final picked = await _picker.pickImage(source: ImageSource.gallery);
+
+    if (picked == null || !mounted) {
+      return;
+    }
+
+    final cropped = await _coverCropper.crop(picked.path);
+    if (cropped != null && mounted) {
+      setState(() {
+        _coverFile = cropped;
+      });
     }
   }
 
@@ -50,11 +116,22 @@ class _VehicleFormPageState extends State<VehicleFormPage> {
     _colorController.dispose();
     _chassisController.dispose();
     _engineController.dispose();
+    _kilometersController.dispose();
     super.dispose();
   }
 
   Future<void> _handleSubmit() async {
     if (!_formKey.currentState!.validate()) {
+      return;
+    }
+
+    if (widget.vehicle == null && !_termsAccepted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Leia e aceite os termos de uso para continuar.'),
+          backgroundColor: Colors.red,
+        ),
+      );
       return;
     }
 
@@ -81,16 +158,25 @@ class _VehicleFormPageState extends State<VehicleFormPage> {
         'engine': _engineController.text.trim().isEmpty
             ? null
             : _engineController.text.trim(),
+        'current_kilometers': int.parse(_kilometersController.text.trim()),
+        if (widget.vehicle == null) 'terms_accepted': true,
       };
 
       Response response;
+      String? vehicleId;
+
       if (widget.vehicle != null) {
-        response = await apiService.updateVehicle(
-          widget.vehicle!.id.toString(),
-          vehicleData,
-        );
+        vehicleId = widget.vehicle!.id.toString();
+        response = await apiService.updateVehicle(vehicleId, vehicleData);
       } else {
         response = await apiService.createVehicle(vehicleData);
+        if (response.data['data']?['id'] != null) {
+          vehicleId = response.data['data']['id'].toString();
+        }
+      }
+
+      if (response.data['success'] == true && _coverFile != null && vehicleId != null) {
+        await apiService.uploadVehicleCover(vehicleId, _coverFile!);
       }
 
       if (response.data['success'] == true && mounted) {
@@ -138,6 +224,42 @@ class _VehicleFormPageState extends State<VehicleFormPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                Center(
+                  child: Column(
+                    children: [
+                      GestureDetector(
+                        onTap: _pickCover,
+                        child: _coverFile != null
+                            ? ClipRRect(
+                                borderRadius: BorderRadius.circular(12),
+                                child: AspectRatio(
+                                  aspectRatio: CoverFraming.aspectRatio,
+                                  child: Image.file(
+                                    _coverFile!,
+                                    fit: BoxFit.cover,
+                                  ),
+                                ),
+                              )
+                            : VehicleCoverAvatar(
+                                coverPhotoUrl: _existingCoverUrl,
+                                size: 160,
+                                borderRadius: 12,
+                              ),
+                      ),
+                      TextButton.icon(
+                        onPressed: _pickCover,
+                        icon: const Icon(Icons.crop),
+                        label: const Text(CoverFraming.pickLabel),
+                      ),
+                      const Text(
+                        CoverFraming.hint,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(fontSize: 12, color: Colors.black54),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
                 TextFormField(
                   controller: _licensePlateController,
                   decoration: const InputDecoration(
@@ -263,9 +385,49 @@ class _VehicleFormPageState extends State<VehicleFormPage> {
                     border: OutlineInputBorder(),
                   ),
                 ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _kilometersController,
+                  decoration: InputDecoration(
+                    labelText: widget.vehicle == null
+                        ? 'Quilometragem atual *'
+                        : 'Quilometragem atual',
+                    prefixIcon: const Icon(Icons.speed),
+                    border: const OutlineInputBorder(),
+                    helperText: 'Informe o hodômetro atual do veículo.',
+                  ),
+                  keyboardType: TextInputType.number,
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'Informe a quilometragem atual';
+                    }
+                    final km = int.tryParse(value.trim());
+                    if (km == null || km < 0) {
+                      return 'Quilometragem inválida';
+                    }
+                    return null;
+                  },
+                ),
+                if (widget.vehicle == null) ...[
+                  const SizedBox(height: 16),
+                  if (_loadingTerms)
+                    const Center(child: CircularProgressIndicator())
+                  else if (_termsContent.isNotEmpty)
+                    TermsScrollAcceptance(
+                      content: _termsContent,
+                      onAcceptedChanged: (accepted) {
+                        setState(() {
+                          _termsAccepted = accepted;
+                        });
+                      },
+                    ),
+                ],
                 const SizedBox(height: 32),
                 ElevatedButton(
-                  onPressed: _isLoading ? null : _handleSubmit,
+                  onPressed: _isLoading ||
+                          (widget.vehicle == null && !_termsAccepted)
+                      ? null
+                      : _handleSubmit,
                   style: ElevatedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 16),
                   ),

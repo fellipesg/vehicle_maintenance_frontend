@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:provider/provider.dart';
+
+import '../../models/login_result.dart';
 import '../../services/auth_service.dart';
 import '../home_page.dart';
-import 'dart:convert';
+import 'two_factor_challenge_page.dart';
 
 class OAuthWebViewPage extends StatefulWidget {
   final String provider;
@@ -120,13 +122,30 @@ class _OAuthWebViewPageState extends State<OAuthWebViewPage> {
 
       // Process the OAuth callback
       final authService = Provider.of<AuthService>(context, listen: false);
-      await authService.processOAuthCallback(widget.provider, queryParams);
+      final result =
+          await authService.processOAuthCallback(widget.provider, queryParams);
 
-      if (mounted) {
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (_) => const HomePage()),
-          (route) => false,
-        );
+      if (!mounted) {
+        return;
+      }
+
+      switch (result) {
+        case LoginSuccess():
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(builder: (_) => const HomePage()),
+            (route) => false,
+          );
+        case LoginNeedsTwoFactor(:final challengeToken):
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(
+              builder: (_) => TwoFactorChallengePage(
+                challengeToken: challengeToken,
+              ),
+            ),
+            (route) => false,
+          );
+        case LoginFailure():
+          throw Exception('Erro ao processar login');
       }
     } catch (e) {
       if (mounted) {

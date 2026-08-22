@@ -8,6 +8,8 @@ class Vehicle {
   final String? color;
   final String? chassis;
   final String? engine;
+  final String? coverPhotoUrl;
+  final int? currentKilometers;
   final List<dynamic>? maintenances;
 
   Vehicle({
@@ -20,6 +22,8 @@ class Vehicle {
     this.color,
     this.chassis,
     this.engine,
+    this.coverPhotoUrl,
+    this.currentKilometers,
     this.maintenances,
   });
 
@@ -34,6 +38,8 @@ class Vehicle {
       color: json['color'],
       chassis: json['chassis'],
       engine: json['engine'],
+      coverPhotoUrl: json['cover_photo_url'],
+      currentKilometers: json['current_kilometers'],
       maintenances: json['maintenances'],
     );
   }
@@ -49,6 +55,7 @@ class Vehicle {
       'color': color,
       'chassis': chassis,
       'engine': engine,
+      if (currentKilometers != null) 'current_kilometers': currentKilometers,
     };
   }
 

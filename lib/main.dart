@@ -1,17 +1,28 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'firebase_options.dart';
+import 'firebase_messaging_background.dart';
+import 'services/push_notification_setup.dart';
+import 'services/notification_navigation.dart';
 import 'views/home_page.dart';
-import 'views/auth/login_page.dart';
+import 'views/auth/login_hub_page.dart';
 import 'services/api_service.dart';
 import 'services/auth_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+  try {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+    FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+    await PushNotificationSetup.configure();
+  } catch (e, st) {
+    debugPrint('Firebase.initializeApp failed (continuing): $e');
+    debugPrint('$st');
+  }
   runApp(const MyApp());
 }
 
@@ -41,9 +52,17 @@ class _MyAppState extends State<MyApp> {
 
   Future<void> _initializeApp() async {
     await _authService.loadStoredAuth();
-    setState(() {
-      _isLoading = false;
-    });
+    if (mounted) {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+
+    if (_authService.isAuthenticated) {
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        await PushNotificationSetup.handleInitialMessage();
+      });
+    }
   }
 
   @override
@@ -66,6 +85,7 @@ class _MyAppState extends State<MyApp> {
         Provider<AuthService>.value(value: _authService),
       ],
       child: MaterialApp(
+        navigatorKey: NotificationNavigation.navigatorKey,
         title: 'Vehicle Maintenance',
         debugShowCheckedModeBanner: false,
         theme: ThemeData(
@@ -81,7 +101,9 @@ class _MyAppState extends State<MyApp> {
           ),
         ),
         home:
-            _authService.isAuthenticated ? const HomePage() : const LoginPage(),
+            _authService.isAuthenticated
+                ? const HomePage()
+                : const LoginHubPage(),
       ),
     );
   }
