@@ -85,6 +85,13 @@ class ApiService {
     return await _dio.get('/vehicle-pdf-exports/$exportId');
   }
 
+  Future<Response> downloadVehiclePdfExport(String exportId) async {
+    return await _dio.get(
+      '/vehicle-pdf-exports/$exportId/download',
+      options: Options(responseType: ResponseType.bytes),
+    );
+  }
+
   Future<Response> downloadFromUrl(String url) async {
     return await _dio.get(
       url,

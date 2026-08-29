@@ -174,13 +174,8 @@ class _VehicleDetailPageState extends State<VehicleDetailPage> {
         throw Exception('A geração do PDF demorou mais que o esperado. Tente novamente.');
       }
 
-      final downloadUrl = exportData['download_url'] as String?;
-      if (downloadUrl == null || downloadUrl.isEmpty) {
-        throw Exception('Link de download do PDF indisponível.');
-      }
-
       final filenameFromApi = exportData['filename'] as String?;
-      final response = await apiService.downloadFromUrl(downloadUrl);
+      final response = await apiService.downloadVehiclePdfExport(exportId);
 
       final directory = await getApplicationDocumentsDirectory();
       final fileName = filenameFromApi ??
