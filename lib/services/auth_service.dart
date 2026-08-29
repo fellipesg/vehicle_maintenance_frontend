@@ -287,15 +287,15 @@ class AuthService {
 
   Future<void> logout() async {
     try {
+      // Remove FCM token while the Bearer token is still valid
+      await _fcmService?.removeToken();
+
       if (_token != null) {
         await _apiService.dio.post('/logout');
       }
     } catch (e) {
       // Continue with logout even if API call fails
     } finally {
-      // Remove FCM token on logout
-      await _fcmService?.removeToken();
-
       _token = null;
       _user = null;
       final prefs = await SharedPreferences.getInstance();

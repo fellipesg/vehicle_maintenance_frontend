@@ -115,11 +115,10 @@ class _VehicleDetailPageState extends State<VehicleDetailPage> {
 
   Future<void> _handleExportPdf() async {
     ScaffoldMessengerState? messenger;
-    
+
     try {
       final apiService = Provider.of<ApiService>(context, listen: false);
-      
-      // Show loading indicator
+
       if (mounted) {
         messenger = ScaffoldMessenger.of(context);
         messenger.showSnackBar(
@@ -135,42 +134,74 @@ class _VehicleDetailPageState extends State<VehicleDetailPage> {
                 Text('Gerando PDF...'),
               ],
             ),
-            duration: Duration(seconds: 30),
+            duration: Duration(minutes: 5),
           ),
         );
       }
 
-      // Download PDF with binary response
-      final response = await apiService.dio.get(
-        '/vehicles/${widget.vehicleId}/export-pdf',
-        options: Options(
-          responseType: ResponseType.bytes,
-        ),
-      );
+      final queueResponse = await apiService.requestVehiclePdfExport(widget.vehicleId.toString());
+      final exportId = queueResponse.data['data']['export_id'] as String?;
 
-      // Get documents directory (downloads may not be available on all platforms)
+      if (exportId == null || exportId.isEmpty) {
+        throw Exception('Não foi possível iniciar a exportação do PDF.');
+      }
+
+      const pollInterval = Duration(seconds: 2);
+      const maxAttempts = 90;
+      Map<String, dynamic>? exportData;
+
+      for (var attempt = 0; attempt < maxAttempts; attempt++) {
+        if (attempt > 0) {
+          await Future<void>.delayed(pollInterval);
+        }
+
+        final statusResponse = await apiService.getVehiclePdfExportStatus(exportId);
+        exportData = Map<String, dynamic>.from(statusResponse.data['data'] as Map);
+        final status = exportData['status'] as String?;
+
+        if (status == 'completed') {
+          break;
+        }
+
+        if (status == 'failed') {
+          final message = exportData['error_message'] as String? ??
+              'Não foi possível gerar o PDF. Tente novamente.';
+          throw Exception(message);
+        }
+      }
+
+      if (exportData == null || exportData['status'] != 'completed') {
+        throw Exception('A geração do PDF demorou mais que o esperado. Tente novamente.');
+      }
+
+      final downloadUrl = exportData['download_url'] as String?;
+      if (downloadUrl == null || downloadUrl.isEmpty) {
+        throw Exception('Link de download do PDF indisponível.');
+      }
+
+      final filenameFromApi = exportData['filename'] as String?;
+      final response = await apiService.downloadFromUrl(downloadUrl);
+
       final directory = await getApplicationDocumentsDirectory();
-      final fileName = 'historico_manutencoes_${_vehicle?.licensePlate ?? widget.vehicleId}_${DateTime.now().millisecondsSinceEpoch}.pdf';
+      final fileName = filenameFromApi ??
+          'historico_manutencoes_${_vehicle?.licensePlate ?? widget.vehicleId}_${DateTime.now().millisecondsSinceEpoch}.pdf';
       final filePath = '${directory.path}/$fileName';
       final file = File(filePath);
 
-      // Write the file
-      await file.writeAsBytes(response.data);
+      await file.writeAsBytes(response.data as List<int>);
 
-      // Close loading snackbar
       if (mounted && messenger != null) {
         messenger.hideCurrentSnackBar();
       }
 
-      // Open the file
       final uri = Uri.file(filePath);
-      
+
       if (await canLaunchUrl(uri)) {
         await launchUrl(
           uri,
           mode: LaunchMode.externalApplication,
         );
-        
+
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -192,11 +223,10 @@ class _VehicleDetailPageState extends State<VehicleDetailPage> {
         }
       }
     } catch (e) {
-      // Close loading snackbar on error
       if (mounted && messenger != null) {
         messenger.hideCurrentSnackBar();
       }
-      
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(

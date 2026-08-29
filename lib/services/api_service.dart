@@ -34,8 +34,11 @@ class ApiService {
   Dio get dio => _dio;
 
   // Get user's vehicles
-  Future<Response> getMyVehicles() async {
-    return await _dio.get('/my-vehicles');
+  Future<Response> getMyVehicles({int page = 1, int perPage = 15}) async {
+    return await _dio.get('/my-vehicles', queryParameters: {
+      'page': page,
+      'per_page': perPage,
+    });
   }
 
   // Vehicle endpoints
@@ -63,12 +66,32 @@ class ApiService {
     return await _dio.delete('/vehicles/$id');
   }
 
-  Future<Response> getVehicleMaintenances(String vehicleId) async {
-    return await _dio.get('/vehicles/$vehicleId/maintenances');
+  Future<Response> getVehicleMaintenances(
+    String vehicleId, {
+    int page = 1,
+    int perPage = 15,
+  }) async {
+    return await _dio.get('/vehicles/$vehicleId/maintenances', queryParameters: {
+      'page': page,
+      'per_page': perPage,
+    });
   }
 
-  Future<Response> exportVehiclePdf(String vehicleId) async {
-    return await _dio.get('/vehicles/$vehicleId/export-pdf');
+  Future<Response> requestVehiclePdfExport(String vehicleId) async {
+    return await _dio.post('/vehicles/$vehicleId/export-pdf');
+  }
+
+  Future<Response> getVehiclePdfExportStatus(String exportId) async {
+    return await _dio.get('/vehicle-pdf-exports/$exportId');
+  }
+
+  Future<Response> downloadFromUrl(String url) async {
+    return await _dio.get(
+      url,
+      options: Options(
+        responseType: ResponseType.bytes,
+      ),
+    );
   }
 
   Future<Response> getVehicleTimeline(String vehicleId) async {
@@ -80,8 +103,16 @@ class ApiService {
   }
 
   // Maintenance endpoints
-  Future<Response> getMaintenances({Map<String, dynamic>? queryParams}) async {
-    return await _dio.get('/maintenances', queryParameters: queryParams);
+  Future<Response> getMaintenances({
+    Map<String, dynamic>? queryParams,
+    int page = 1,
+    int perPage = 15,
+  }) async {
+    return await _dio.get('/maintenances', queryParameters: {
+      'page': page,
+      'per_page': perPage,
+      ...?queryParams,
+    });
   }
 
   Future<Response> getMaintenance(String id) async {
@@ -132,8 +163,16 @@ class ApiService {
   }
 
   // Workshop endpoints
-  Future<Response> getWorkshops({Map<String, dynamic>? queryParams}) async {
-    return await _dio.get('/workshops', queryParameters: queryParams);
+  Future<Response> getWorkshops({
+    Map<String, dynamic>? queryParams,
+    int page = 1,
+    int perPage = 15,
+  }) async {
+    return await _dio.get('/workshops', queryParameters: {
+      'page': page,
+      'per_page': perPage,
+      ...?queryParams,
+    });
   }
 
   Future<Response> getWorkshop(String id) async {
