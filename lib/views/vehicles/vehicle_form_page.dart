@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:dio/dio.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../models/vehicle.dart';
@@ -37,8 +38,10 @@ class _VehicleFormPageState extends State<VehicleFormPage> {
   bool _loadingTerms = false;
   final ImagePicker _picker = ImagePicker();
   final CoverImageCropper _coverCropper = CoverImageCropper();
-  File? _coverFile;
-  String? _existingCoverUrl;
+  File? _coverLandscapeFile;
+  File? _coverPortraitFile;
+  String? _existingLandscapeUrl;
+  String? _existingPortraitUrl;
 
   @override
   void initState() {
@@ -52,7 +55,8 @@ class _VehicleFormPageState extends State<VehicleFormPage> {
       _colorController.text = widget.vehicle!.color ?? '';
       _chassisController.text = widget.vehicle!.chassis ?? '';
       _engineController.text = widget.vehicle!.engine ?? '';
-      _existingCoverUrl = widget.vehicle!.coverPhotoUrl;
+      _existingLandscapeUrl = widget.vehicle!.coverPhotoUrl;
+      _existingPortraitUrl = widget.vehicle!.coverPhotoPortraitUrl;
       if (widget.vehicle!.currentKilometers != null) {
         _kilometersController.text =
             widget.vehicle!.currentKilometers.toString();
@@ -91,17 +95,32 @@ class _VehicleFormPageState extends State<VehicleFormPage> {
     }
   }
 
-  Future<void> _pickCover() async {
+  Future<void> _pickLandscapeCover() async {
     final picked = await _picker.pickImage(source: ImageSource.gallery);
 
     if (picked == null || !mounted) {
       return;
     }
 
-    final cropped = await _coverCropper.crop(picked.path);
+    final cropped = await _coverCropper.cropLandscape(picked.path);
     if (cropped != null && mounted) {
       setState(() {
-        _coverFile = cropped;
+        _coverLandscapeFile = cropped;
+      });
+    }
+  }
+
+  Future<void> _pickPortraitCover() async {
+    final picked = await _picker.pickImage(source: ImageSource.gallery);
+
+    if (picked == null || !mounted) {
+      return;
+    }
+
+    final cropped = await _coverCropper.cropPortrait(picked.path);
+    if (cropped != null && mounted) {
+      setState(() {
+        _coverPortraitFile = cropped;
       });
     }
   }
@@ -125,6 +144,33 @@ class _VehicleFormPageState extends State<VehicleFormPage> {
       return;
     }
 
+    final newPlate = _licensePlateController.text.trim().toUpperCase();
+    if (widget.vehicle != null &&
+        newPlate != widget.vehicle!.licensePlate.toUpperCase()) {
+      final registerChange = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Registrar troca de placa?'),
+          content: const Text(
+            'A placa anterior ficará no histórico.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancelar'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Registrar'),
+            ),
+          ],
+        ),
+      );
+      if (registerChange != true) {
+        return;
+      }
+    }
+
     if (widget.vehicle == null && !_termsAccepted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -142,7 +188,7 @@ class _VehicleFormPageState extends State<VehicleFormPage> {
     try {
       final apiService = Provider.of<ApiService>(context, listen: false);
       final vehicleData = {
-        'license_plate': _licensePlateController.text.trim().toUpperCase(),
+        'license_plate': newPlate,
         'renavam': _renavamController.text.trim().isEmpty
             ? null
             : _renavamController.text.trim(),
@@ -152,9 +198,7 @@ class _VehicleFormPageState extends State<VehicleFormPage> {
         'color': _colorController.text.trim().isEmpty
             ? null
             : _colorController.text.trim(),
-        'chassis': _chassisController.text.trim().isEmpty
-            ? null
-            : _chassisController.text.trim(),
+        'chassis': _chassisController.text.trim().toUpperCase(),
         'engine': _engineController.text.trim().isEmpty
             ? null
             : _engineController.text.trim(),
@@ -167,6 +211,10 @@ class _VehicleFormPageState extends State<VehicleFormPage> {
 
       if (widget.vehicle != null) {
         vehicleId = widget.vehicle!.id.toString();
+        if (newPlate != widget.vehicle!.licensePlate.toUpperCase()) {
+          vehicleData['plate_changed_at'] =
+              DateTime.now().toUtc().toIso8601String();
+        }
         response = await apiService.updateVehicle(vehicleId, vehicleData);
       } else {
         response = await apiService.createVehicle(vehicleData);
@@ -175,8 +223,14 @@ class _VehicleFormPageState extends State<VehicleFormPage> {
         }
       }
 
-      if (response.data['success'] == true && _coverFile != null && vehicleId != null) {
-        await apiService.uploadVehicleCover(vehicleId, _coverFile!);
+      if (response.data['success'] == true &&
+          vehicleId != null &&
+          (_coverLandscapeFile != null || _coverPortraitFile != null)) {
+        await apiService.uploadVehicleCover(
+          vehicleId,
+          landscape: _coverLandscapeFile,
+          portrait: _coverPortraitFile,
+        );
       }
 
       if (response.data['success'] == true && mounted) {
@@ -210,6 +264,72 @@ class _VehicleFormPageState extends State<VehicleFormPage> {
     }
   }
 
+  Widget _coverPreview({
+    required File? file,
+    required String? existingUrl,
+    required double aspectRatio,
+    required double fallbackSize,
+  }) {
+    if (file != null) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: AspectRatio(
+          aspectRatio: aspectRatio,
+          child: Image.file(
+            file,
+            fit: BoxFit.cover,
+          ),
+        ),
+      );
+    }
+
+    return VehicleCoverAvatar(
+      coverPhotoUrl: existingUrl,
+      coverPhotoPortraitUrl: existingUrl,
+      size: fallbackSize,
+      borderRadius: 12,
+    );
+  }
+
+  Widget _coverSection({
+    required String title,
+    required String pickLabel,
+    required String hint,
+    required File? file,
+    required String? existingUrl,
+    required double aspectRatio,
+    required VoidCallback onPick,
+  }) {
+    return Column(
+      children: [
+        Text(
+          title,
+          style: Theme.of(context).textTheme.titleSmall,
+        ),
+        const SizedBox(height: 8),
+        GestureDetector(
+          onTap: onPick,
+          child: _coverPreview(
+            file: file,
+            existingUrl: existingUrl,
+            aspectRatio: aspectRatio,
+            fallbackSize: aspectRatio >= 1 ? 160 : 120,
+          ),
+        ),
+        TextButton.icon(
+          onPressed: onPick,
+          icon: const Icon(Icons.crop),
+          label: Text(pickLabel),
+        ),
+        Text(
+          hint,
+          textAlign: TextAlign.center,
+          style: const TextStyle(fontSize: 12, color: Colors.black54),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -224,40 +344,64 @@ class _VehicleFormPageState extends State<VehicleFormPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Center(
-                  child: Column(
-                    children: [
-                      GestureDetector(
-                        onTap: _pickCover,
-                        child: _coverFile != null
-                            ? ClipRRect(
-                                borderRadius: BorderRadius.circular(12),
-                                child: AspectRatio(
-                                  aspectRatio: CoverFraming.aspectRatio,
-                                  child: Image.file(
-                                    _coverFile!,
-                                    fit: BoxFit.cover,
-                                  ),
-                                ),
-                              )
-                            : VehicleCoverAvatar(
-                                coverPhotoUrl: _existingCoverUrl,
-                                size: 160,
-                                borderRadius: 12,
-                              ),
-                      ),
-                      TextButton.icon(
-                        onPressed: _pickCover,
-                        icon: const Icon(Icons.crop),
-                        label: const Text(CoverFraming.pickLabel),
-                      ),
-                      const Text(
-                        CoverFraming.hint,
-                        textAlign: TextAlign.center,
-                        style: TextStyle(fontSize: 12, color: Colors.black54),
-                      ),
-                    ],
+                _coverSection(
+                  title: 'Capa paisagem (celular deitado)',
+                  pickLabel: CoverFramingLandscape.pickLabel,
+                  hint: CoverFramingLandscape.hint,
+                  file: _coverLandscapeFile,
+                  existingUrl: _existingLandscapeUrl,
+                  aspectRatio: CoverFramingLandscape.aspectRatio,
+                  onPick: _pickLandscapeCover,
+                ),
+                const SizedBox(height: 24),
+                _coverSection(
+                  title: 'Capa retrato (celular em pé)',
+                  pickLabel: CoverFramingPortrait.pickLabel,
+                  hint: CoverFramingPortrait.hint,
+                  file: _coverPortraitFile,
+                  existingUrl: _existingPortraitUrl ?? _existingLandscapeUrl,
+                  aspectRatio: CoverFramingPortrait.aspectRatio,
+                  onPick: _pickPortraitCover,
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  key: const Key('vehicle_chassis_field'),
+                  controller: _chassisController,
+                  decoration: const InputDecoration(
+                    labelText: 'Chassi *',
+                    prefixIcon: Icon(Icons.qr_code),
+                    border: OutlineInputBorder(),
+                    helperText:
+                        'O chassi identifica o veículo para sempre. A placa pode mudar.',
                   ),
+                  textCapitalization: TextCapitalization.characters,
+                  maxLength: 17,
+                  inputFormatters: [
+                    FilteringTextInputFormatter.allow(RegExp(r'[A-Za-z0-9]')),
+                    TextInputFormatter.withFunction((oldValue, newValue) {
+                      return newValue.copyWith(
+                        text: newValue.text.toUpperCase(),
+                        selection: newValue.selection,
+                      );
+                    }),
+                  ],
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'Informe o chassi';
+                    }
+                    final len = value.trim().length;
+                    final year = int.tryParse(_yearController.text.trim());
+                    final minLen = year != null && year < 1990 ? 9 : 17;
+                    if (len < minLen) {
+                      return minLen == 17
+                          ? 'Chassi deve ter 17 caracteres'
+                          : 'Chassi deve ter entre 9 e 17 caracteres';
+                    }
+                    if (len > 17) {
+                      return 'Chassi deve ter no máximo 17 caracteres';
+                    }
+                    return null;
+                  },
                 ),
                 const SizedBox(height: 16),
                 TextFormField(
@@ -266,7 +410,7 @@ class _VehicleFormPageState extends State<VehicleFormPage> {
                     labelText: 'Placa *',
                     prefixIcon: Icon(Icons.confirmation_number),
                     border: OutlineInputBorder(),
-                    helperText: 'Ex: ABC1234',
+                    helperText: 'Placa atual',
                   ),
                   textCapitalization: TextCapitalization.characters,
                   maxLength: 7,
@@ -347,7 +491,9 @@ class _VehicleFormPageState extends State<VehicleFormPage> {
                             return 'Por favor, insira o ano';
                           }
                           final year = int.tryParse(value);
-                          if (year == null || year < 1900 || year > DateTime.now().year + 1) {
+                          if (year == null ||
+                              year < 1900 ||
+                              year > DateTime.now().year + 1) {
                             return 'Ano inválido';
                           }
                           return null;
@@ -366,15 +512,6 @@ class _VehicleFormPageState extends State<VehicleFormPage> {
                       ),
                     ),
                   ],
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: _chassisController,
-                  decoration: const InputDecoration(
-                    labelText: 'Chassi',
-                    prefixIcon: Icon(Icons.qr_code),
-                    border: OutlineInputBorder(),
-                  ),
                 ),
                 const SizedBox(height: 16),
                 TextFormField(
@@ -424,10 +561,10 @@ class _VehicleFormPageState extends State<VehicleFormPage> {
                 ],
                 const SizedBox(height: 32),
                 ElevatedButton(
-                  onPressed: _isLoading ||
-                          (widget.vehicle == null && !_termsAccepted)
-                      ? null
-                      : _handleSubmit,
+                  onPressed:
+                      _isLoading || (widget.vehicle == null && !_termsAccepted)
+                          ? null
+                          : _handleSubmit,
                   style: ElevatedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 16),
                   ),
@@ -437,7 +574,8 @@ class _VehicleFormPageState extends State<VehicleFormPage> {
                           width: 20,
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
-                      : Text(widget.vehicle != null ? 'Atualizar' : 'Cadastrar'),
+                      : Text(
+                          widget.vehicle != null ? 'Atualizar' : 'Cadastrar'),
                 ),
               ],
             ),
@@ -447,4 +585,3 @@ class _VehicleFormPageState extends State<VehicleFormPage> {
     );
   }
 }
-

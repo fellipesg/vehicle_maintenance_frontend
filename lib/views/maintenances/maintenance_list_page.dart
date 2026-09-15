@@ -1,18 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:intl/intl.dart';
 import 'package:dio/dio.dart';
 import '../../models/maintenance.dart';
-import '../../models/vehicle.dart';
 import '../../services/api_service.dart';
-import '../../widgets/vehicle_cover_avatar.dart';
+import '../../widgets/provenance/provenance_card.dart';
+import '../../widgets/provenance/provenance_legend.dart';
 import 'maintenance_detail_page.dart';
 import 'maintenance_form_page.dart';
 
 class MaintenanceListPage extends StatefulWidget {
   final int? vehicleId;
+  final bool? verifiedFilter;
 
-  const MaintenanceListPage({super.key, this.vehicleId});
+  const MaintenanceListPage({
+    super.key,
+    this.vehicleId,
+    this.verifiedFilter,
+  });
 
   @override
   State<MaintenanceListPage> createState() => _MaintenanceListPageState();
@@ -21,31 +25,13 @@ class MaintenanceListPage extends StatefulWidget {
 class _MaintenanceListPageState extends State<MaintenanceListPage> {
   List<Maintenance> _maintenances = [];
   bool _isLoading = true;
-  Vehicle? _vehicle;
+  bool? _verifiedFilter;
 
   @override
   void initState() {
     super.initState();
+    _verifiedFilter = widget.verifiedFilter;
     _loadMaintenances();
-    if (widget.vehicleId != null) {
-      _loadVehicle();
-    }
-  }
-
-  Future<void> _loadVehicle() async {
-    try {
-      final apiService = Provider.of<ApiService>(context, listen: false);
-      final response =
-          await apiService.getVehicle(widget.vehicleId.toString());
-
-      if (response.data['success'] == true && mounted) {
-        setState(() {
-          _vehicle = Vehicle.fromJson(response.data['data']);
-        });
-      }
-    } catch (_) {
-      // Cover photo fallback handled by widget.
-    }
   }
 
   Future<void> _loadMaintenances() async {
@@ -54,8 +40,10 @@ class _MaintenanceListPageState extends State<MaintenanceListPage> {
       Response response;
 
       if (widget.vehicleId != null) {
-        response = await apiService
-            .getVehicleMaintenances(widget.vehicleId.toString());
+        response = await apiService.getVehicleMaintenances(
+          widget.vehicleId.toString(),
+          verified: _verifiedFilter,
+        );
       } else {
         response = await apiService.getMaintenances();
       }
@@ -77,53 +65,6 @@ class _MaintenanceListPageState extends State<MaintenanceListPage> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Erro ao carregar manutenções: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
-  }
-
-  Future<void> _handleDelete(Maintenance maintenance) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Confirmar exclusão'),
-        content: const Text('Tem certeza que deseja excluir esta manutenção?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancelar'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: const Text('Excluir'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed != true) return;
-
-    try {
-      final apiService = Provider.of<ApiService>(context, listen: false);
-      await apiService.deleteMaintenance(maintenance.id.toString());
-
-      if (mounted) {
-        _loadMaintenances();
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Manutenção excluída com sucesso!'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Erro ao excluir manutenção: $e'),
             backgroundColor: Colors.red,
           ),
         );
@@ -168,91 +109,30 @@ class _MaintenanceListPageState extends State<MaintenanceListPage> {
                 )
               : RefreshIndicator(
                   onRefresh: _loadMaintenances,
-                  child: ListView.builder(
+                  child: ListView(
                     padding: const EdgeInsets.all(16),
-                    itemCount: _maintenances.length,
-                    itemBuilder: (context, index) {
-                      final maintenance = _maintenances[index];
-                      return Card(
-                        margin: const EdgeInsets.only(bottom: 12),
-                        child: ListTile(
-                          leading: VehicleCoverAvatar(
-                            coverPhotoUrl: _vehicle?.coverPhotoUrl,
-                            size: 48,
-                          ),
-                          title: Text(
-                            _getMaintenanceTypeLabel(
-                                maintenance.maintenanceType),
-                            style: const TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                          subtitle: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                DateFormat('dd/MM/yyyy')
-                                    .format(maintenance.maintenanceDate),
-                              ),
-                              if (maintenance.workshopName != null)
-                                Text(maintenance.workshopName!),
-                              if (maintenance.kilometers != null)
-                                Text('${maintenance.kilometers} km'),
-                            ],
-                          ),
-                          trailing: PopupMenuButton(
-                            itemBuilder: (context) => [
-                              const PopupMenuItem(
-                                value: 'edit',
-                                child: Row(
-                                  children: [
-                                    Icon(Icons.edit),
-                                    SizedBox(width: 8),
-                                    Text('Editar'),
-                                  ],
-                                ),
-                              ),
-                              const PopupMenuItem(
-                                value: 'delete',
-                                child: Row(
-                                  children: [
-                                    Icon(Icons.delete, color: Colors.red),
-                                    SizedBox(width: 8),
-                                    Text('Excluir',
-                                        style: TextStyle(color: Colors.red)),
-                                  ],
-                                ),
-                              ),
-                            ],
-                            onSelected: (value) {
-                              if (value == 'edit') {
-                                Navigator.of(context)
-                                    .push(
-                                      MaterialPageRoute(
-                                        builder: (_) => MaintenanceFormPage(
-                                          vehicleId: maintenance.vehicleId,
-                                          maintenance: maintenance,
-                                        ),
+                    children: [
+                      const ProvenanceLegend(),
+                      const SizedBox(height: 12),
+                      for (final maintenance in _maintenances)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 12),
+                          child: ProvenanceCard(
+                            maintenance: maintenance,
+                            onTap: () {
+                              Navigator.of(context)
+                                  .push(
+                                    MaterialPageRoute(
+                                      builder: (_) => MaintenanceDetailPage(
+                                        maintenanceId: maintenance.id!,
                                       ),
-                                    )
-                                    .then((_) => _loadMaintenances());
-                              } else if (value == 'delete') {
-                                _handleDelete(maintenance);
-                              }
+                                    ),
+                                  )
+                                  .then((_) => _loadMaintenances());
                             },
                           ),
-                          onTap: () {
-                            Navigator.of(context)
-                                .push(
-                                  MaterialPageRoute(
-                                    builder: (_) => MaintenanceDetailPage(
-                                      maintenanceId: maintenance.id!,
-                                    ),
-                                  ),
-                                )
-                                .then((_) => _loadMaintenances());
-                          },
                         ),
-                      );
-                    },
+                    ],
                   ),
                 ),
       floatingActionButton: widget.vehicleId != null
@@ -274,18 +154,4 @@ class _MaintenanceListPageState extends State<MaintenanceListPage> {
     );
   }
 
-  String _getMaintenanceTypeLabel(String type) {
-    switch (type) {
-      case 'preventive':
-        return 'Preventiva';
-      case 'corrective':
-        return 'Corretiva';
-      case 'inspection':
-        return 'Inspeção';
-      case 'other':
-        return 'Outra';
-      default:
-        return type;
-    }
-  }
 }

@@ -1,17 +1,23 @@
+import 'dart:io';
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:provider/provider.dart';
-import 'package:dio/dio.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:url_launcher/url_launcher.dart';
-import 'dart:io';
+import 'package:provider/provider.dart';
+
 import '../../models/vehicle.dart';
 import '../../services/api_service.dart';
+import '../../utils/pdf_download_file_name.dart';
+import '../../widgets/provenance/provenance_strip.dart';
 import '../../widgets/vehicle_cover_avatar.dart';
+import '../../widgets/vehicle_identity.dart';
 import '../../widgets/vehicle_maintenance_timeline.dart';
-import 'vehicle_form_page.dart';
+import '../../models/vehicle_plate.dart';
 import '../maintenances/maintenance_form_page.dart';
 import '../maintenances/maintenance_list_page.dart';
+import '../pdf_viewer_page.dart';
+import 'vehicle_form_page.dart';
 
 class VehicleDetailPage extends StatefulWidget {
   final int vehicleId;
@@ -27,6 +33,7 @@ class _VehicleDetailPageState extends State<VehicleDetailPage> {
   bool _isLoading = true;
   int _maintenanceCount = 0;
   Map<String, dynamic>? _timeline;
+  bool? _verifiedFilter;
 
   @override
   void initState() {
@@ -44,9 +51,12 @@ class _VehicleDetailPageState extends State<VehicleDetailPage> {
       if (response.data['success'] == true && mounted) {
         setState(() {
           _vehicle = Vehicle.fromJson(response.data['data']);
-          _maintenanceCount = _vehicle?.maintenances?.length ?? 0;
+          _maintenanceCount = _vehicle?.maintenancesCount ??
+              _vehicle?.maintenances?.length ??
+              0;
           if (timelineResponse.data['success'] == true) {
-            _timeline = Map<String, dynamic>.from(timelineResponse.data['data']);
+            _timeline =
+                Map<String, dynamic>.from(timelineResponse.data['data']);
           }
           _isLoading = false;
         });
@@ -139,7 +149,8 @@ class _VehicleDetailPageState extends State<VehicleDetailPage> {
         );
       }
 
-      final queueResponse = await apiService.requestVehiclePdfExport(widget.vehicleId.toString());
+      final queueResponse =
+          await apiService.requestVehiclePdfExport(widget.vehicleId.toString());
       final exportId = queueResponse.data['data']['export_id'] as String?;
 
       if (exportId == null || exportId.isEmpty) {
@@ -151,12 +162,22 @@ class _VehicleDetailPageState extends State<VehicleDetailPage> {
       Map<String, dynamic>? exportData;
 
       for (var attempt = 0; attempt < maxAttempts; attempt++) {
+        if (!mounted) {
+          return;
+        }
+
         if (attempt > 0) {
           await Future<void>.delayed(pollInterval);
         }
 
-        final statusResponse = await apiService.getVehiclePdfExportStatus(exportId);
-        exportData = Map<String, dynamic>.from(statusResponse.data['data'] as Map);
+        if (!mounted) {
+          return;
+        }
+
+        final statusResponse =
+            await apiService.getVehiclePdfExportStatus(exportId);
+        exportData =
+            Map<String, dynamic>.from(statusResponse.data['data'] as Map);
         final status = exportData['status'] as String?;
 
         if (status == 'completed') {
@@ -170,53 +191,50 @@ class _VehicleDetailPageState extends State<VehicleDetailPage> {
         }
       }
 
+      if (!mounted) {
+        return;
+      }
+
       if (exportData == null || exportData['status'] != 'completed') {
-        throw Exception('A geração do PDF demorou mais que o esperado. Tente novamente.');
+        throw Exception(
+            'A geração do PDF demorou mais que o esperado. Tente novamente.');
       }
 
       final filenameFromApi = exportData['filename'] as String?;
       final response = await apiService.downloadVehiclePdfExport(exportId);
 
-      final directory = await getApplicationDocumentsDirectory();
-      final fileName = filenameFromApi ??
-          'historico_manutencoes_${_vehicle?.licensePlate ?? widget.vehicleId}_${DateTime.now().millisecondsSinceEpoch}.pdf';
-      final filePath = '${directory.path}/$fileName';
-      final file = File(filePath);
+      if (!mounted) {
+        return;
+      }
 
-      await file.writeAsBytes(response.data as List<int>);
+      final bytes =
+          Uint8List.fromList(List<int>.from(response.data as List<int>));
+      final directory = await getApplicationDocumentsDirectory();
+      final fileName = pdfDownloadFileName(
+        fromApi: filenameFromApi,
+        fallback:
+            'historico_manutencoes_${_vehicle?.licensePlate ?? widget.vehicleId}.pdf',
+      );
+      await File('${directory.path}/$fileName')
+          .writeAsBytes(bytes, flush: true);
 
       if (mounted && messenger != null) {
         messenger.hideCurrentSnackBar();
       }
 
-      final uri = Uri.file(filePath);
-
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(
-          uri,
-          mode: LaunchMode.externalApplication,
-        );
-
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('PDF salvo em: $filePath'),
-              backgroundColor: Colors.green,
-              duration: const Duration(seconds: 4),
-            ),
-          );
-        }
-      } else {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('PDF salvo em: $filePath'),
-              backgroundColor: Colors.green,
-              duration: const Duration(seconds: 4),
-            ),
-          );
-        }
+      if (!mounted) {
+        return;
       }
+
+      await Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => PdfViewerPage(
+            title: 'Histórico de manutenções',
+            fileName: fileName,
+            bytes: bytes,
+          ),
+        ),
+      );
     } catch (e) {
       if (mounted && messenger != null) {
         messenger.hideCurrentSnackBar();
@@ -279,6 +297,33 @@ class _VehicleDetailPageState extends State<VehicleDetailPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final isWide = constraints.maxWidth >= 600;
+                  final heroUrl = isWide
+                      ? (_vehicle!.coverPhotoUrl ??
+                          _vehicle!.coverPhotoPortraitUrl)
+                      : (_vehicle!.coverPhotoPortraitUrl ??
+                          _vehicle!.coverPhotoUrl);
+
+                  if (heroUrl == null || heroUrl.isEmpty) {
+                    return const SizedBox.shrink();
+                  }
+
+                  return ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: AspectRatio(
+                      aspectRatio: isWide ? 16 / 9 : 9 / 16,
+                      child: Image.network(
+                        heroUrl,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                      ),
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(height: 16),
               Card(
                 child: Padding(
                   padding: const EdgeInsets.all(16),
@@ -289,6 +334,8 @@ class _VehicleDetailPageState extends State<VehicleDetailPage> {
                         children: [
                           VehicleCoverAvatar(
                             coverPhotoUrl: _vehicle!.coverPhotoUrl,
+                            coverPhotoPortraitUrl:
+                                _vehicle!.coverPhotoPortraitUrl,
                             size: 72,
                             borderRadius: 12,
                           ),
@@ -299,27 +346,48 @@ class _VehicleDetailPageState extends State<VehicleDetailPage> {
                               children: [
                                 Text(
                                   _vehicle!.displayName,
-                                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .headlineSmall
+                                      ?.copyWith(
                                         fontWeight: FontWeight.bold,
                                       ),
-                                ),
-                                Text(
-                                  'Placa: ${_vehicle!.licensePlate}',
-                                  style: Theme.of(context).textTheme.bodyLarge,
                                 ),
                               ],
                             ),
                           ),
                         ],
                       ),
+                      const SizedBox(height: 12),
+                      VehicleIdentity(
+                        vehicle: _vehicle!,
+                        size: VehicleIdentitySize.hero,
+                        showCopy: true,
+                      ),
+                      if ((_vehicle!.plateHistory ?? []).isNotEmpty)
+                        ExpansionTile(
+                          key: const Key('plate_history_tile'),
+                          title: const Text('Histórico de placas'),
+                          children: _vehicle!.plateHistory!
+                              .map(
+                                (VehiclePlate plate) => ListTile(
+                                  dense: true,
+                                  title: Text(plate.plate),
+                                  subtitle: Text(
+                                    '${plate.startedAt != null ? DateFormat('dd/MM/yyyy').format(plate.startedAt!) : '—'} · '
+                                    '${plate.endedAt != null ? DateFormat('dd/MM/yyyy').format(plate.endedAt!) : 'Vigente'} · '
+                                    '${plate.source ?? ''}',
+                                  ),
+                                ),
+                              )
+                              .toList(),
+                        ),
                       const Divider(height: 32),
                       _buildInfoRow('Ano', _vehicle!.year.toString()),
                       if (_vehicle!.color != null)
                         _buildInfoRow('Cor', _vehicle!.color!),
                       if (_vehicle!.renavam != null)
                         _buildInfoRow('RENAVAM', _vehicle!.renavam!),
-                      if (_vehicle!.chassis != null)
-                        _buildInfoRow('Chassi', _vehicle!.chassis!),
                       if (_vehicle!.engine != null)
                         _buildInfoRow('Motor', _vehicle!.engine!),
                       if (_vehicle!.currentKilometers != null)
@@ -327,16 +395,34 @@ class _VehicleDetailPageState extends State<VehicleDetailPage> {
                           'Quilometragem atual',
                           '${NumberFormat.decimalPattern('pt_BR').format(_vehicle!.currentKilometers)} km',
                         ),
-                      if (_timeline?['summary']?['approximate_annual_kilometers'] != null)
+                      if (_timeline?['summary']
+                              ?['approximate_annual_kilometers'] !=
+                          null)
                         _buildInfoRow(
                           'Média aprox. por ano',
                           '~${NumberFormat.decimalPattern('pt_BR').format(_timeline!['summary']['approximate_annual_kilometers'])} km/ano',
-                          subtitle: 'Estimativa com base no cadastro e nas manutenções.',
+                          subtitle:
+                              'Estimativa com base no cadastro e nas manutenções.',
                         ),
                     ],
                   ),
                 ),
               ),
+              if (_vehicle!.provenanceStrip != null &&
+                  _vehicle!.provenanceStrip!.isNotEmpty) ...[
+                const SizedBox(height: 16),
+                ProvenanceStrip(
+                  segments: _vehicle!.provenanceStrip!,
+                  totalMaintenances: _vehicle!.maintenancesCount ??
+                      _vehicle!.provenanceStrip!.length,
+                  verifiedCount: _vehicle!.verifiedMaintenancesCount ?? 0,
+                  verifiedFilter: _verifiedFilter,
+                  onFilterChanged: (filter) {
+                    setState(() => _verifiedFilter = filter);
+                  },
+                  onTapSegment: (_) {},
+                ),
+              ],
               if (_timeline != null) ...[
                 const SizedBox(height: 16),
                 VehicleMaintenanceTimeline(timeline: _timeline!),
@@ -353,7 +439,10 @@ class _VehicleDetailPageState extends State<VehicleDetailPage> {
                       onTap: () {
                         Navigator.of(context).push(
                           MaterialPageRoute(
-                            builder: (_) => MaintenanceListPage(vehicleId: widget.vehicleId),
+                            builder: (_) => MaintenanceListPage(
+                              vehicleId: widget.vehicleId,
+                              verifiedFilter: _verifiedFilter,
+                            ),
                           ),
                         );
                       },
@@ -366,7 +455,8 @@ class _VehicleDetailPageState extends State<VehicleDetailPage> {
                       onTap: () async {
                         final result = await Navigator.of(context).push(
                           MaterialPageRoute(
-                            builder: (_) => MaintenanceFormPage(vehicleId: widget.vehicleId),
+                            builder: (_) => MaintenanceFormPage(
+                                vehicleId: widget.vehicleId),
                           ),
                         );
                         if (result == true) {
@@ -444,4 +534,3 @@ class _VehicleDetailPageState extends State<VehicleDetailPage> {
     );
   }
 }
-

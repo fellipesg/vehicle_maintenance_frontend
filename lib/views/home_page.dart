@@ -5,6 +5,7 @@ import '../../services/api_service.dart';
 import '../../models/vehicle.dart';
 import '../../widgets/user_avatar.dart';
 import '../../widgets/vehicle_cover_avatar.dart';
+import '../../widgets/vehicle_identity.dart';
 import 'auth/login_hub_page.dart';
 import 'profile/profile_edit_page.dart';
 import 'profile/settings_page.dart';
@@ -30,8 +31,17 @@ class _HomePageState extends State<HomePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Vehicle Maintenance'),
-        backgroundColor: Theme.of(context).colorScheme.primary,
+        title: Align(
+          alignment: Alignment.centerLeft,
+          child: Image.asset(
+            'assets/brand/lockup-horizontal.png',
+            height: 32,
+            fit: BoxFit.contain,
+            alignment: Alignment.centerLeft,
+          ),
+        ),
+        centerTitle: false,
+        backgroundColor: const Color(0xFF0B1C2C),
         foregroundColor: Colors.white,
       ),
       body: _pages[_selectedIndex],
@@ -167,6 +177,7 @@ class _VehiclesPageState extends State<VehiclesPage> {
               child: ListTile(
                 leading: VehicleCoverAvatar(
                   coverPhotoUrl: vehicle.coverPhotoUrl,
+                  coverPhotoPortraitUrl: vehicle.coverPhotoPortraitUrl,
                   size: 48,
                 ),
                 title: Text(
@@ -176,7 +187,8 @@ class _VehiclesPageState extends State<VehiclesPage> {
                 subtitle: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Placa: ${vehicle.licensePlate}'),
+                    VehicleIdentity(vehicle: vehicle),
+                    const SizedBox(height: 4),
                     Text('${vehicle.year} - ${vehicle.color ?? 'N/A'}'),
                     if (maintenances.isNotEmpty)
                       Text(

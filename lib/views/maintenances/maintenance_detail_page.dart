@@ -9,9 +9,12 @@ import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../models/maintenance.dart';
 import '../../models/maintenance_item.dart';
+import '../../models/maintenance_warranty.dart';
 import '../../models/invoice.dart';
 import '../../models/vehicle.dart';
 import '../../services/api_service.dart';
+import '../../services/auth_service.dart';
+import '../../widgets/provenance/provenance_seal.dart';
 import '../../widgets/vehicle_cover_avatar.dart';
 import 'maintenance_form_page.dart';
 
@@ -28,6 +31,17 @@ class _MaintenanceDetailPageState extends State<MaintenanceDetailPage> {
   Maintenance? _maintenance;
   Vehicle? _vehicle;
   bool _isLoading = true;
+
+  bool get _isWorkshopPortal {
+    final auth = Provider.of<AuthService>(context, listen: false);
+    return auth.isWorkshopUser;
+  }
+
+  String get _entityLabel =>
+      _isWorkshopPortal ? 'ordem de serviço' : 'manutenção';
+
+  String get _entityLabelTitle =>
+      _isWorkshopPortal ? 'Ordem de Serviço' : 'Manutenção';
 
   @override
   void initState() {
@@ -56,7 +70,7 @@ class _MaintenanceDetailPageState extends State<MaintenanceDetailPage> {
         });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Erro ao carregar manutenção: $e'),
+            content: Text('Erro ao carregar $_entityLabel: $e'),
             backgroundColor: Colors.red,
           ),
         );
@@ -124,7 +138,8 @@ class _MaintenanceDetailPageState extends State<MaintenanceDetailPage> {
         messenger.hideCurrentSnackBar();
       }
 
-      final bytes = Uint8List.fromList(List<int>.from(response.data as List<int>));
+      final bytes =
+          Uint8List.fromList(List<int>.from(response.data as List<int>));
       final dir = await getTemporaryDirectory();
       final file = File('${dir.path}/${_safePdfFileName(invoice)}');
       await file.writeAsBytes(bytes, flush: true);
@@ -163,21 +178,21 @@ class _MaintenanceDetailPageState extends State<MaintenanceDetailPage> {
   Widget build(BuildContext context) {
     if (_isLoading) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Detalhes da Manutenção')),
+        appBar: AppBar(title: Text('Detalhes da $_entityLabelTitle')),
         body: const Center(child: CircularProgressIndicator()),
       );
     }
 
     if (_maintenance == null) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Detalhes da Manutenção')),
-        body: const Center(child: Text('Manutenção não encontrada')),
+        appBar: AppBar(title: Text('Detalhes da $_entityLabelTitle')),
+        body: Center(child: Text('$_entityLabelTitle não encontrada')),
       );
     }
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Detalhes da Manutenção'),
+        title: Text('Detalhes da $_entityLabelTitle'),
         actions: [
           IconButton(
             icon: const Icon(Icons.edit),
@@ -208,155 +223,180 @@ class _MaintenanceDetailPageState extends State<MaintenanceDetailPage> {
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 48),
               sliver: SliverList(
                 delegate: SliverChildListDelegate([
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
+                  ProvenanceSeal(maintenance: _maintenance!),
+                  const SizedBox(height: 16),
+                  Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          VehicleCoverAvatar(
-                            coverPhotoUrl: _vehicle?.coverPhotoUrl,
-                            size: 72,
-                            borderRadius: 12,
-                          ),
-                          const SizedBox(width: 16),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  _getMaintenanceTypeLabel(
-                                      _maintenance!.maintenanceType),
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .headlineSmall
-                                      ?.copyWith(
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                ),
-                                Text(
-                                  DateFormat('dd/MM/yyyy')
-                                      .format(_maintenance!.maintenanceDate),
-                                  style: Theme.of(context).textTheme.bodyLarge,
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                      const Divider(height: 32),
-                      if (_maintenance!.workshop != null ||
-                          _maintenance!.workshopName != null)
-                        _buildWorkshopSection(),
-                      if (_maintenance!.kilometers != null)
-                        _buildInfoRow(
-                            'Quilometragem', '${_maintenance!.kilometers} km'),
-                      if (_maintenance!.serviceCategory != null)
-                        _buildInfoRow(
-                          'Categoria',
-                          _getServiceCategoryLabel(
-                              _maintenance!.serviceCategory!),
-                        ),
-                      if (_maintenance!.description != null)
-                        _buildInfoRow('Descrição', _maintenance!.description!),
-                      if (_maintenance!.isManufacturerRequired == true)
-                        const Chip(
-                          label: Text('Exigida pelo fabricante'),
-                          avatar: Icon(Icons.verified, size: 18),
-                        ),
-                    ],
-                  ),
-                ),
-              ),
-              if (_maintenance!.items != null &&
-                  _maintenance!.items!.isNotEmpty) ...[
-                const SizedBox(height: 16),
-                Card(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Text(
-                          'Itens da Manutenção',
-                          style:
-                              Theme.of(context).textTheme.titleLarge?.copyWith(
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                        ),
-                      ),
-                      const Divider(height: 1),
-                      ..._maintenance!.items!.map((MaintenanceItem item) {
-                        return ListTile(
-                          title: Text(item.name),
-                          subtitle: item.description != null
-                              ? Text(item.description!)
-                              : null,
-                          trailing: Text(
-                            '${item.quantity}x R\$ ${item.totalPrice.toStringAsFixed(2)}',
-                            style: const TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                        );
-                      }),
-                    ],
-                  ),
-                ),
-              ],
-              if (_maintenance!.invoices != null &&
-                  _maintenance!.invoices!.isNotEmpty) ...[
-                const SizedBox(height: 16),
-                Card(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Text(
-                          'Notas Fiscais',
-                          style:
-                              Theme.of(context).textTheme.titleLarge?.copyWith(
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                        ),
-                      ),
-                      const Divider(height: 1),
-                      ..._maintenance!.invoices!.map((Invoice invoice) {
-                        return ListTile(
-                          leading: const Icon(Icons.picture_as_pdf,
-                              color: Colors.red),
-                          title: Text(invoice.fileName),
-                          subtitle: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                          Row(
                             children: [
-                              if (invoice.invoiceNumber != null)
-                                Text('Número: ${invoice.invoiceNumber}'),
-                              if (invoice.invoiceDate != null)
-                                Text(
-                                  'Data: ${DateFormat('dd/MM/yyyy').format(invoice.invoiceDate!)}',
+                              VehicleCoverAvatar(
+                                coverPhotoUrl: _vehicle?.coverPhotoUrl,
+                                size: 72,
+                                borderRadius: 12,
+                              ),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      _getMaintenanceTypeLabel(
+                                          _maintenance!.maintenanceType),
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .headlineSmall
+                                          ?.copyWith(
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                    ),
+                                    Text(
+                                      DateFormat('dd/MM/yyyy').format(
+                                          _maintenance!.maintenanceDate),
+                                      style:
+                                          Theme.of(context).textTheme.bodyLarge,
+                                    ),
+                                  ],
                                 ),
-                              if (invoice.totalAmount != null)
-                                Text(
-                                  'Valor: R\$ ${invoice.totalAmount!.toStringAsFixed(2)}',
-                                  style: const TextStyle(
-                                      fontWeight: FontWeight.bold),
-                                ),
+                              ),
                             ],
                           ),
-                          trailing: IconButton(
-                            icon: const Icon(Icons.download),
-                            onPressed: () => _viewInvoice(invoice),
-                            tooltip: 'Visualizar Nota Fiscal',
-                          ),
-                          onTap: () => _viewInvoice(invoice),
-                        );
-                      }),
-                    ],
+                          const Divider(height: 32),
+                          if (_maintenance!.workshop != null ||
+                              _maintenance!.workshopName != null)
+                            _buildWorkshopSection(),
+                          if (_maintenance!.kilometers != null)
+                            _buildInfoRow('Quilometragem',
+                                '${_maintenance!.kilometers} km'),
+                          if (_maintenance!.serviceCategory != null)
+                            _buildInfoRow(
+                              'Categoria',
+                              _getServiceCategoryLabel(
+                                  _maintenance!.serviceCategory!),
+                            ),
+                          if (_maintenance!.description != null)
+                            _buildInfoRow(
+                                'Descrição', _maintenance!.description!),
+                          if (_maintenance!.isManufacturerRequired == true)
+                            const Chip(
+                              label: Text('Exigida pelo fabricante'),
+                              avatar: Icon(Icons.verified, size: 18),
+                            ),
+                          if (_maintenance!.generalWarranty != null) ...[
+                            const SizedBox(height: 12),
+                            _buildGeneralWarrantyChip(
+                                _maintenance!.generalWarranty!),
+                          ],
+                        ],
+                      ),
+                    ),
                   ),
-                ),
-              ],
-            ]),
+                  if (_maintenance!.items != null &&
+                      _maintenance!.items!.isNotEmpty) ...[
+                    const SizedBox(height: 16),
+                    Card(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Text(
+                              _isWorkshopPortal
+                                  ? 'Itens da OS'
+                                  : 'Itens da Manutenção',
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .titleLarge
+                                  ?.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                            ),
+                          ),
+                          const Divider(height: 1),
+                          ..._maintenance!.items!.map((MaintenanceItem item) {
+                            return ListTile(
+                              title: Text(item.name),
+                              subtitle: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  if (item.description != null)
+                                    Text(item.description!),
+                                  if (item.hasWarranty || item.warranty != null)
+                                    Padding(
+                                      padding: const EdgeInsets.only(top: 6),
+                                      child: _buildItemWarrantySection(item),
+                                    ),
+                                ],
+                              ),
+                              trailing: Text(
+                                '${item.quantity}x R\$ ${item.totalPrice.toStringAsFixed(2)}',
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.bold),
+                              ),
+                            );
+                          }),
+                        ],
+                      ),
+                    ),
+                  ],
+                  if (_maintenance!.invoices != null &&
+                      _maintenance!.invoices!.isNotEmpty) ...[
+                    const SizedBox(height: 16),
+                    Card(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Text(
+                              'Notas Fiscais',
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .titleLarge
+                                  ?.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                            ),
+                          ),
+                          const Divider(height: 1),
+                          ..._maintenance!.invoices!.map((Invoice invoice) {
+                            return ListTile(
+                              leading: const Icon(Icons.picture_as_pdf,
+                                  color: Colors.red),
+                              title: Text(invoice.fileName),
+                              subtitle: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  if (invoice.invoiceNumber != null)
+                                    Text('Número: ${invoice.invoiceNumber}'),
+                                  if (invoice.invoiceDate != null)
+                                    Text(
+                                      'Data: ${DateFormat('dd/MM/yyyy').format(invoice.invoiceDate!)}',
+                                    ),
+                                  if (invoice.totalAmount != null)
+                                    Text(
+                                      'Valor: R\$ ${invoice.totalAmount!.toStringAsFixed(2)}',
+                                      style: const TextStyle(
+                                          fontWeight: FontWeight.bold),
+                                    ),
+                                ],
+                              ),
+                              trailing: IconButton(
+                                icon: const Icon(Icons.download),
+                                onPressed: () => _viewInvoice(invoice),
+                                tooltip: 'Visualizar Nota Fiscal',
+                              ),
+                              onTap: () => _viewInvoice(invoice),
+                            );
+                          }),
+                        ],
+                      ),
+                    ),
+                  ],
+                ]),
               ),
             ),
           ],
@@ -428,6 +468,103 @@ class _MaintenanceDetailPageState extends State<MaintenanceDetailPage> {
     }
   }
 
+  Widget _buildWorkshopLogo(String? logoUrl) {
+    if (logoUrl == null || logoUrl.isEmpty) {
+      return Icon(
+        Icons.build_circle,
+        size: 48,
+        color: Theme.of(context).colorScheme.primary,
+      );
+    }
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(8),
+      child: Image.network(
+        logoUrl,
+        width: 48,
+        height: 48,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => Icon(
+          Icons.build_circle,
+          size: 48,
+          color: Theme.of(context).colorScheme.primary,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildGeneralWarrantyChip(MaintenanceWarranty warranty) {
+    final label = warranty.label ??
+        (warranty.endsAt != null
+            ? 'Em garantia até ${DateFormat('dd/MM/yyyy').format(warranty.endsAt!)}'
+            : warranty.name);
+
+    return Chip(
+      label: Text(label),
+      avatar: Icon(
+        warranty.isVigente ? Icons.verified : Icons.history,
+        size: 18,
+      ),
+      backgroundColor:
+          warranty.isVigente ? Colors.green.shade50 : Colors.orange.shade50,
+      side: BorderSide(
+        color:
+            warranty.isVigente ? Colors.green.shade300 : Colors.orange.shade300,
+      ),
+    );
+  }
+
+  Widget _buildItemWarrantySection(MaintenanceItem item) {
+    final label = item.displayWarrantyLabel;
+    final warrantyName = item.warrantyName;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (warrantyName != null && warrantyName.isNotEmpty)
+          Text(
+            warrantyName,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+          ),
+        if (label != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 4,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                Chip(
+                  label: Text(
+                    item.isUnderWarranty ? 'Em garantia' : 'Garantia encerrada',
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                  backgroundColor: item.isUnderWarranty
+                      ? Colors.green.shade50
+                      : Colors.orange.shade50,
+                  side: BorderSide(
+                    color: item.isUnderWarranty
+                        ? Colors.green.shade300
+                        : Colors.orange.shade300,
+                  ),
+                  visualDensity: VisualDensity.compact,
+                  padding: EdgeInsets.zero,
+                ),
+                Text(
+                  label,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Colors.grey.shade700,
+                      ),
+                ),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+
   Widget _buildWorkshopSection() {
     final workshop = _maintenance!.workshop;
     final workshopName = _maintenance!.workshopName;
@@ -441,22 +578,20 @@ class _MaintenanceDetailPageState extends State<MaintenanceDetailPage> {
       children: [
         Row(
           children: [
-            Icon(
-              Icons.build_circle,
-              color: Theme.of(context).colorScheme.primary,
-            ),
-            const SizedBox(width: 8),
-            Text(
-              'Oficina',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
+            _buildWorkshopLogo(workshop?.logoUrl),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'Oficina',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+              ),
             ),
           ],
         ),
         const SizedBox(height: 12),
         if (workshop != null) ...[
-          // Nome da oficina
           Text(
             workshop.name,
             style: Theme.of(context).textTheme.titleLarge?.copyWith(
