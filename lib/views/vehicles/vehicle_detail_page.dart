@@ -1,12 +1,14 @@
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
 
 import '../../models/vehicle.dart';
+import '../../repositories/vehicle_repository.dart';
 import '../../services/api_service.dart';
 import '../../utils/pdf_download_file_name.dart';
 import '../../widgets/provenance/provenance_strip.dart';
@@ -21,8 +23,13 @@ import 'vehicle_form_page.dart';
 
 class VehicleDetailPage extends StatefulWidget {
   final int vehicleId;
+  final Vehicle? initialVehicle;
 
-  const VehicleDetailPage({super.key, required this.vehicleId});
+  const VehicleDetailPage({
+    super.key,
+    required this.vehicleId,
+    this.initialVehicle,
+  });
 
   @override
   State<VehicleDetailPage> createState() => _VehicleDetailPageState();
@@ -38,6 +45,10 @@ class _VehicleDetailPageState extends State<VehicleDetailPage> {
   @override
   void initState() {
     super.initState();
+    if (widget.initialVehicle != null) {
+      _vehicle = widget.initialVehicle;
+      _isLoading = false;
+    }
     _loadVehicle();
   }
 
@@ -103,6 +114,7 @@ class _VehicleDetailPageState extends State<VehicleDetailPage> {
       await apiService.deleteVehicle(widget.vehicleId.toString());
 
       if (mounted) {
+        await context.read<VehicleRepository>().invalidate();
         Navigator.of(context).pop(true);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -310,14 +322,20 @@ class _VehicleDetailPageState extends State<VehicleDetailPage> {
                     return const SizedBox.shrink();
                   }
 
+                  final cacheWidth = (constraints.maxWidth *
+                          MediaQuery.devicePixelRatioOf(context))
+                      .round();
+
                   return ClipRRect(
                     borderRadius: BorderRadius.circular(12),
                     child: AspectRatio(
                       aspectRatio: isWide ? 16 / 9 : 9 / 16,
-                      child: Image.network(
-                        heroUrl,
+                      child: CachedNetworkImage(
+                        imageUrl: heroUrl,
                         fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                        memCacheWidth: cacheWidth,
+                        fadeInDuration: const Duration(milliseconds: 150),
+                        errorWidget: (_, __, ___) => const SizedBox.shrink(),
                       ),
                     ),
                   );
@@ -336,6 +354,7 @@ class _VehicleDetailPageState extends State<VehicleDetailPage> {
                             coverPhotoUrl: _vehicle!.coverPhotoUrl,
                             coverPhotoPortraitUrl:
                                 _vehicle!.coverPhotoPortraitUrl,
+                            coverPhotoThumbUrl: _vehicle!.coverPhotoThumbUrl,
                             size: 72,
                             borderRadius: 12,
                           ),
