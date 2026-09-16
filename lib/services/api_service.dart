@@ -1,6 +1,8 @@
 import 'package:dio/dio.dart';
 import 'dart:io';
 
+import '../models/vehicle_lookup_result.dart';
+
 class ApiService {
   final Dio _dio;
   final String baseUrl;
@@ -50,8 +52,19 @@ class ApiService {
     return await _dio.get('/vehicles/$id');
   }
 
-  Future<Response> searchVehicle(String identifier) async {
+  Future<VehicleLookupResult> searchVehicle(String identifier) async {
+    final response = await _dio.get('/vehicles/search/$identifier');
+    return VehicleLookupResult.fromApi(
+      Map<String, dynamic>.from(response.data as Map),
+    );
+  }
+
+  Future<Response> searchVehicleRaw(String identifier) async {
     return await _dio.get('/vehicles/search/$identifier');
+  }
+
+  Future<Response> getVehiclePlates(int vehicleId) async {
+    return await _dio.get('/vehicles/$vehicleId/plates');
   }
 
   Future<Response> createVehicle(Map<String, dynamic> data) async {
@@ -70,10 +83,13 @@ class ApiService {
     String vehicleId, {
     int page = 1,
     int perPage = 15,
+    bool? verified,
   }) async {
-    return await _dio.get('/vehicles/$vehicleId/maintenances', queryParameters: {
+    return await _dio
+        .get('/vehicles/$vehicleId/maintenances', queryParameters: {
       'page': page,
       'per_page': perPage,
+      if (verified != null) 'verified': verified ? 1 : 0,
     });
   }
 
@@ -186,12 +202,34 @@ class ApiService {
     return await _dio.get('/workshops/$id');
   }
 
-  Future<Response> createWorkshop(Map<String, dynamic> data) async {
-    return await _dio.post('/workshops', data: data);
+  Future<Response> createWorkshop(FormData formData) async {
+    return await _dio.post(
+      '/workshops',
+      data: formData,
+      options: Options(contentType: 'multipart/form-data'),
+    );
   }
 
-  Future<Response> updateWorkshop(String id, Map<String, dynamic> data) async {
-    return await _dio.put('/workshops/$id', data: data);
+  Future<Response> updateWorkshop(String id, FormData formData) async {
+    return await _dio.put(
+      '/workshops/$id',
+      data: formData,
+      options: Options(contentType: 'multipart/form-data'),
+    );
+  }
+
+  Future<Response> getWarrantyTemplates(
+    String workshopId, {
+    int page = 1,
+    int perPage = 100,
+  }) async {
+    return await _dio.get(
+      '/workshops/$workshopId/warranty-templates',
+      queryParameters: {
+        'page': page,
+        'per_page': perPage,
+      },
+    );
   }
 
   Future<Response> deleteWorkshop(String id) async {
@@ -218,13 +256,28 @@ class ApiService {
     );
   }
 
-  Future<Response> uploadVehicleCover(String vehicleId, File file) async {
-    final formData = FormData.fromMap({
-      'cover': await MultipartFile.fromFile(
-        file.path,
-        filename: file.path.split('/').last,
-      ),
-    });
+  Future<Response> uploadVehicleCover(
+    String vehicleId, {
+    File? landscape,
+    File? portrait,
+  }) async {
+    final fields = <String, dynamic>{};
+
+    if (landscape != null) {
+      fields['cover'] = await MultipartFile.fromFile(
+        landscape.path,
+        filename: landscape.path.split('/').last,
+      );
+    }
+
+    if (portrait != null) {
+      fields['cover_portrait'] = await MultipartFile.fromFile(
+        portrait.path,
+        filename: portrait.path.split('/').last,
+      );
+    }
+
+    final formData = FormData.fromMap(fields);
 
     return await _dio.post(
       '/vehicles/$vehicleId/cover',
