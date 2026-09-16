@@ -7,6 +7,15 @@ abstract final class ProvenanceTheme {
   static const Color declaredSurface = Color(0xFFFFFBEB);
   static const Color verifiedSurface = Colors.white;
 
+  /// Legível em [verifiedSurface] com o app em tema escuro global.
+  static const Color verifiedTitle = Color(0xFF0B1C2C);
+  static const Color verifiedBody = Color(0xFF1E293B);
+  static const Color verifiedMetaColor = Color(0xFF64748B);
+
+  static const Color declaredTitle = Color(0xFF1F2937);
+  static const Color declaredBody = Color(0xFF374151);
+  static const Color declaredMeta = Color(0xFF6B7280);
+
   static const double markerSize = 28;
   static const double markerSizeSm = 20;
   static const double railWidth = 3;

@@ -7,16 +7,40 @@ class ProvenanceRail extends StatelessWidget {
     super.key,
     required this.isVerified,
     this.height = 48,
+    this.expand = false,
   });
 
   final bool isVerified;
+
+  /// Fixed height when [expand] is false.
   final double height;
+
+  /// Fill remaining vertical space (e.g. timeline connector between markers).
+  final bool expand;
 
   @override
   Widget build(BuildContext context) {
+    final painter = _ProvenanceRailPainter(isVerified: isVerified);
+
+    if (expand) {
+      return LayoutBuilder(
+        builder: (context, constraints) {
+          final railHeight = constraints.maxHeight;
+          if (!railHeight.isFinite || railHeight <= 0) {
+            return const SizedBox.shrink();
+          }
+
+          return CustomPaint(
+            size: Size(ProvenanceTheme.railWidth, railHeight),
+            painter: painter,
+          );
+        },
+      );
+    }
+
     return CustomPaint(
       size: Size(ProvenanceTheme.railWidth, height),
-      painter: _ProvenanceRailPainter(isVerified: isVerified),
+      painter: painter,
     );
   }
 }

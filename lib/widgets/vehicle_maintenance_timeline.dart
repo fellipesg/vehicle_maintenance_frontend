@@ -290,167 +290,177 @@ class _TimelineRow extends StatelessWidget {
     final maintenance = _maintenanceFromTimelineEvent(event);
     final isMaintenance = maintenance != null;
 
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SizedBox(
-          width: 72,
-          child: Padding(
-            padding: const EdgeInsets.only(top: 2),
-            child: Text(
-              formatKm(event['kilometers']),
-              textAlign: TextAlign.right,
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-                color: isUpcoming ? colorScheme.outline : colorScheme.onSurface,
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 72,
+            child: Padding(
+              padding: const EdgeInsets.only(top: 2),
+              child: Text(
+                formatKm(event['kilometers']),
+                textAlign: TextAlign.right,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color:
+                      isUpcoming ? colorScheme.outline : colorScheme.onSurface,
+                ),
               ),
             ),
           ),
-        ),
-        Padding(
-          padding: const EdgeInsets.only(top: 4),
-          child: SizedBox(
-            width: 28,
-            child: Column(
-              children: [
-                if (isMaintenance)
-                  ProvenanceMarker(
-                    isVerified: maintenance.isVerified,
-                    workshopLogoUrl: maintenance.verifiedWorkshop?.logoUrl,
-                    workshopName: maintenance.workshopName,
-                    size: ProvenanceMarkerSize.sm,
-                  )
-                else
-                  Container(
-                    width: 14,
-                    height: 14,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: isUpcoming ? Colors.transparent : primaryColor,
-                      border: Border.all(
-                        color: primaryColor,
-                        width: isUpcoming ? 2 : 0,
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: SizedBox(
+              width: 28,
+              child: Column(
+                children: [
+                  if (isMaintenance)
+                    ProvenanceMarker(
+                      isVerified: maintenance.isVerified,
+                      workshopLogoUrl: maintenance.verifiedWorkshop?.logoUrl,
+                      workshopName: maintenance.workshopName,
+                      size: ProvenanceMarkerSize.sm,
+                    )
+                  else
+                    Container(
+                      width: 14,
+                      height: 14,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: isUpcoming ? Colors.transparent : primaryColor,
+                        border: Border.all(
+                          color: primaryColor,
+                          width: isUpcoming ? 2 : 0,
+                        ),
                       ),
                     ),
-                  ),
-                if (!isLast)
-                  isMaintenance
-                      ? ProvenanceRail(
-                          isVerified: maintenance.isVerified,
-                          height: isExpanded ? 24 : 12,
-                        )
-                      : Container(
-                          width: 2,
-                          height: isExpanded ? 24 : 12,
-                          margin: const EdgeInsets.symmetric(vertical: 2),
-                          color: isUpcoming
-                              ? colorScheme.outline.withValues(alpha: 0.35)
-                              : colorScheme.outlineVariant,
-                        ),
-              ],
+                  if (!isLast)
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 4),
+                        child: isMaintenance
+                            ? ProvenanceRail(
+                                isVerified: maintenance.isVerified,
+                                expand: true,
+                              )
+                            : Center(
+                                child: Container(
+                                  width: 2,
+                                  color: isUpcoming
+                                      ? colorScheme.outline
+                                          .withValues(alpha: 0.35)
+                                      : colorScheme.outlineVariant,
+                                ),
+                              ),
+                      ),
+                    ),
+                ],
+              ),
             ),
           ),
-        ),
-        Expanded(
-          child: Padding(
-            padding: const EdgeInsets.only(left: 4, bottom: 12),
-            child: Material(
-              color: Colors.transparent,
-              child: InkWell(
-                onTap: onTap,
-                borderRadius: BorderRadius.circular(12),
-                child: Ink(
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: isUpcoming
-                          ? colorScheme.outline.withValues(alpha: 0.6)
-                          : (isCurrent
-                              ? colorScheme.primary
-                              : colorScheme.outlineVariant),
-                      width: isCurrent ? 2 : 1,
-                    ),
-                    color: isCurrent
-                        ? colorScheme.primary.withValues(alpha: 0.06)
-                        : null,
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Icon(
-                              icon,
-                              size: 18,
-                              color: isUpcoming
-                                  ? colorScheme.outline
-                                  : colorScheme.primary,
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    event['label']?.toString() ?? 'Evento',
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.w600,
-                                      fontSize: 13,
-                                    ),
-                                  ),
-                                  if (event['date'] != null)
-                                    Text(
-                                      formatDate(event['date']?.toString()),
-                                      style:
-                                          Theme.of(context).textTheme.bodySmall,
-                                    )
-                                  else if (isUpcoming)
-                                    Text(
-                                      'Estimativa · ${formatKm(event['kilometers_remaining'] ?? event['kilometers'])} restantes',
-                                      style: Theme.of(context)
-                                          .textTheme
-                                          .bodySmall
-                                          ?.copyWith(
-                                            fontStyle: FontStyle.italic,
-                                          ),
-                                    ),
-                                ],
-                              ),
-                            ),
-                            Icon(
-                              isExpanded
-                                  ? Icons.expand_less
-                                  : Icons.expand_more,
-                              color: colorScheme.outline,
-                            ),
-                          ],
-                        ),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.only(left: 4, bottom: 12),
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: onTap,
+                  borderRadius: BorderRadius.circular(12),
+                  child: Ink(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: isUpcoming
+                            ? colorScheme.outline.withValues(alpha: 0.6)
+                            : (isCurrent
+                                ? colorScheme.primary
+                                : colorScheme.outlineVariant),
+                        width: isCurrent ? 2 : 1,
                       ),
-                      if (isExpanded)
+                      color: isCurrent
+                          ? colorScheme.primary.withValues(alpha: 0.06)
+                          : null,
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
                         Padding(
-                          padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-                          child: maintenance != null
-                              ? ProvenanceCard(maintenance: maintenance)
-                              : _EventDetails(
-                                  event: event,
-                                  formatKm: formatKm,
-                                  formatDate: formatDate,
-                                  formatMoney: formatMoney,
+                          padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Icon(
+                                icon,
+                                size: 18,
+                                color: isUpcoming
+                                    ? colorScheme.outline
+                                    : colorScheme.primary,
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      event['label']?.toString() ?? 'Evento',
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 13,
+                                      ),
+                                    ),
+                                    if (event['date'] != null)
+                                      Text(
+                                        formatDate(event['date']?.toString()),
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .bodySmall,
+                                      )
+                                    else if (isUpcoming)
+                                      Text(
+                                        'Estimativa · ${formatKm(event['kilometers_remaining'] ?? event['kilometers'])} restantes',
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .bodySmall
+                                            ?.copyWith(
+                                              fontStyle: FontStyle.italic,
+                                            ),
+                                      ),
+                                  ],
                                 ),
+                              ),
+                              Icon(
+                                isExpanded
+                                    ? Icons.expand_less
+                                    : Icons.expand_more,
+                                color: colorScheme.outline,
+                              ),
+                            ],
+                          ),
                         ),
-                    ],
+                        if (isExpanded)
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                            child: maintenance != null
+                                ? ProvenanceCard(maintenance: maintenance)
+                                : _EventDetails(
+                                    event: event,
+                                    formatKm: formatKm,
+                                    formatDate: formatDate,
+                                    formatMoney: formatMoney,
+                                  ),
+                          ),
+                      ],
+                    ),
                   ),
                 ),
               ),
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }

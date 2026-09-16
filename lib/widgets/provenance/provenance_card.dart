@@ -18,14 +18,22 @@ class ProvenanceCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final verified = maintenance.isVerified;
-    final titleStyle = verified
-        ? Theme.of(context).textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w600,
-            )
-        : Theme.of(context).textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w500,
-              color: Colors.grey.shade800,
-            );
+    final titleStyle = Theme.of(context).textTheme.titleMedium?.copyWith(
+          fontWeight: verified ? FontWeight.w600 : FontWeight.w500,
+          color: verified
+              ? ProvenanceTheme.verifiedTitle
+              : ProvenanceTheme.declaredTitle,
+        );
+    final labelStyle = Theme.of(context).textTheme.bodyMedium?.copyWith(
+          color: verified
+              ? ProvenanceTheme.verifiedBody
+              : ProvenanceTheme.declaredBody,
+        );
+    final metaStyle = Theme.of(context).textTheme.bodySmall?.copyWith(
+          color: verified
+              ? ProvenanceTheme.verifiedMetaColor
+              : ProvenanceTheme.declaredMeta,
+        );
 
     final invoiceMeta = maintenance.hasInvoices
         ? ' · NF anexada (${maintenance.invoices!.length})'
@@ -56,11 +64,11 @@ class ProvenanceCard extends StatelessWidget {
               if (maintenance.provenanceLabel != null)
                 Text(
                   maintenance.provenanceLabel!,
-                  style: Theme.of(context).textTheme.bodyMedium,
+                  style: labelStyle,
                 ),
               Text(
                 '${maintenance.provenanceSublabel ?? (verified ? ProvenanceTheme.verifiedMeta : ProvenanceTheme.unverifiedMeta)}$invoiceMeta',
-                style: Theme.of(context).textTheme.bodySmall,
+                style: metaStyle,
               ),
             ],
           ),
