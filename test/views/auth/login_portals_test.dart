@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:vehicle_maintenance/models/login_portal.dart';
 import 'package:vehicle_maintenance/models/login_result.dart';
+import 'package:vehicle_maintenance/repositories/vehicle_repository.dart';
 import 'package:vehicle_maintenance/services/api_service.dart';
 import 'package:vehicle_maintenance/services/auth_service.dart';
 import 'package:vehicle_maintenance/services/auth_token_storage.dart';
@@ -95,10 +96,15 @@ Widget buildLoginTestApp({
   required AuthService authService,
   ApiService? apiService,
 }) {
+  final resolvedApi = apiService ?? mockApiService();
+
   return MultiProvider(
     providers: [
       Provider<AuthService>.value(value: authService),
-      Provider<ApiService>.value(value: apiService ?? mockApiService()),
+      Provider<ApiService>.value(value: resolvedApi),
+      ChangeNotifierProvider<VehicleRepository>(
+        create: (_) => VehicleRepository(resolvedApi),
+      ),
     ],
     child: MaterialApp(home: home),
   );

@@ -5,12 +5,14 @@ import 'package:dio/dio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/login_result.dart';
+import '../repositories/vehicle_repository.dart';
 import 'api_service.dart';
 import 'auth_token_storage.dart';
 import 'fcm_service.dart';
 
 class AuthService {
   final ApiService _apiService;
+  VehicleRepository? vehicleRepository;
   final AuthTokenStorage _tokenStorage;
   FcmService? _fcmService;
   static const String _legacyTokenKey = SecureAuthTokenStorage.tokenKey;
@@ -320,6 +322,7 @@ class AuthService {
       await prefs.remove(_legacyTokenKey);
       await prefs.remove(_userKey);
       _apiService.setAuthToken(null);
+      await vehicleRepository?.clear();
     }
   }
 

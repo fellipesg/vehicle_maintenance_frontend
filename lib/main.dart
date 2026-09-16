@@ -8,6 +8,7 @@ import 'services/push_notification_setup.dart';
 import 'services/notification_navigation.dart';
 import 'views/home_page.dart';
 import 'views/auth/login_hub_page.dart';
+import 'repositories/vehicle_repository.dart';
 import 'services/api_service.dart';
 import 'services/auth_service.dart';
 
@@ -16,6 +17,7 @@ const Color _brandTeal = Color(0xFF2EC4B6);
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  PaintingBinding.instance.imageCache.maximumSizeBytes = 100 << 20;
   try {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
@@ -44,12 +46,15 @@ class _MyAppState extends State<MyApp> {
     ),
   );
   late final AuthService _authService;
+  late final VehicleRepository _vehicleRepository;
   bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
+    _vehicleRepository = VehicleRepository(_apiService);
     _authService = AuthService(_apiService);
+    _authService.vehicleRepository = _vehicleRepository;
     _initializeApp();
   }
 
@@ -88,6 +93,9 @@ class _MyAppState extends State<MyApp> {
       providers: [
         Provider<ApiService>.value(value: _apiService),
         Provider<AuthService>.value(value: _authService),
+        ChangeNotifierProvider<VehicleRepository>.value(
+          value: _vehicleRepository,
+        ),
       ],
       child: MaterialApp(
         navigatorKey: NotificationNavigation.navigatorKey,

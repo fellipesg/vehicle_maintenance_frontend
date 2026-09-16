@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../services/auth_service.dart';
-import '../../services/api_service.dart';
 import '../../models/vehicle.dart';
+import '../../repositories/vehicle_repository.dart';
 import '../../widgets/user_avatar.dart';
 import '../../widgets/vehicle_cover_avatar.dart';
 import '../../widgets/vehicle_identity.dart';
@@ -23,7 +23,7 @@ class _HomePageState extends State<HomePage> {
   int _selectedIndex = 0;
 
   final List<Widget> _pages = [
-    const VehiclesPage(),
+    const VehiclesPage(key: PageStorageKey('vehicles-tab')),
     const ProfilePage(),
   ];
 
@@ -44,7 +44,10 @@ class _HomePageState extends State<HomePage> {
         backgroundColor: const Color(0xFF0B1C2C),
         foregroundColor: Colors.white,
       ),
-      body: _pages[_selectedIndex],
+      body: IndexedStack(
+        index: _selectedIndex,
+        children: _pages,
+      ),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _selectedIndex,
         onTap: (index) {
@@ -70,57 +73,55 @@ class _HomePageState extends State<HomePage> {
 class VehiclesPage extends StatefulWidget {
   const VehiclesPage({super.key});
 
+  static int initStateCallCount = 0;
+
   @override
   State<VehiclesPage> createState() => _VehiclesPageState();
 }
 
 class _VehiclesPageState extends State<VehiclesPage> {
-  List<Vehicle> _vehicles = [];
-  bool _isLoading = true;
-
   @override
   void initState() {
     super.initState();
-    _loadVehicles();
+    VehiclesPage.initStateCallCount++;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      context.read<VehicleRepository>().load();
+    });
   }
 
-  Future<void> _loadVehicles() async {
-    try {
-      final apiService = Provider.of<ApiService>(context, listen: false);
-      final response = await apiService.getMyVehicles();
-
-      if (response.data['success'] == true && mounted) {
-        setState(() {
-          _vehicles = (response.data['data'] as List)
-              .map((json) => Vehicle.fromJson(json))
-              .toList();
-          _isLoading = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Erro ao carregar veículos: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
+  Future<void> _refresh(VehicleRepository repository) {
+    return repository.load(force: true);
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) {
-      return const Center(
-        child: CircularProgressIndicator(),
-      );
-    }
+    return Consumer<VehicleRepository>(
+      builder: (context, repository, _) {
+        final vehicles = repository.vehicles;
+        final isInitialLoad = vehicles.isEmpty &&
+            repository.isRefreshing &&
+            repository.error == null;
 
-    if (_vehicles.isEmpty) {
+        if (isInitialLoad) {
+          return const Center(
+            child: CircularProgressIndicator(),
+          );
+        }
+
+        return _buildBody(context, repository, vehicles);
+      },
+    );
+  }
+
+  Widget _buildBody(
+    BuildContext context,
+    VehicleRepository repository,
+    List<Vehicle> vehicles,
+  ) {
+    if (vehicles.isEmpty) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -151,7 +152,7 @@ class _VehiclesPageState extends State<VehiclesPage> {
                   ),
                 );
                 if (result == true) {
-                  _loadVehicles();
+                  await context.read<VehicleRepository>().invalidate();
                 }
               },
               icon: const Icon(Icons.add),
@@ -163,58 +164,70 @@ class _VehiclesPageState extends State<VehiclesPage> {
     }
 
     return Scaffold(
-      body: RefreshIndicator(
-        onRefresh: _loadVehicles,
-        child: ListView.builder(
-          padding: const EdgeInsets.all(16),
-          itemCount: _vehicles.length,
-          itemBuilder: (context, index) {
-            final vehicle = _vehicles[index];
-            final maintenances = vehicle.maintenances ?? [];
+      body: Column(
+        children: [
+          if (repository.isRefreshing && vehicles.isNotEmpty)
+            const LinearProgressIndicator(minHeight: 2),
+          Expanded(
+            child: RefreshIndicator(
+              onRefresh: () => _refresh(repository),
+              child: ListView.builder(
+                padding: const EdgeInsets.all(16),
+                itemCount: vehicles.length,
+                itemBuilder: (context, index) {
+                  final vehicle = vehicles[index];
+                  final maintenances = vehicle.maintenances ?? [];
 
-            return Card(
-              margin: const EdgeInsets.only(bottom: 12),
-              child: ListTile(
-                leading: VehicleCoverAvatar(
-                  coverPhotoUrl: vehicle.coverPhotoUrl,
-                  coverPhotoPortraitUrl: vehicle.coverPhotoPortraitUrl,
-                  size: 48,
-                ),
-                title: Text(
-                  vehicle.displayName,
-                  style: const TextStyle(fontWeight: FontWeight.bold),
-                ),
-                subtitle: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    VehicleIdentity(vehicle: vehicle),
-                    const SizedBox(height: 4),
-                    Text('${vehicle.year} - ${vehicle.color ?? 'N/A'}'),
-                    if (maintenances.isNotEmpty)
-                      Text(
-                        '${maintenances.length} manutenção(ões)',
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.primary,
-                          fontSize: 12,
-                        ),
+                  return Card(
+                    margin: const EdgeInsets.only(bottom: 12),
+                    child: ListTile(
+                      leading: VehicleCoverAvatar(
+                        coverPhotoUrl: vehicle.coverPhotoUrl,
+                        coverPhotoPortraitUrl: vehicle.coverPhotoPortraitUrl,
+                        coverPhotoThumbUrl: vehicle.coverPhotoThumbUrl,
+                        size: 48,
                       ),
-                  ],
-                ),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () async {
-                  final result = await Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => VehicleDetailPage(vehicleId: vehicle.id!),
+                      title: Text(
+                        vehicle.displayName,
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      subtitle: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          VehicleIdentity(vehicle: vehicle),
+                          const SizedBox(height: 4),
+                          Text('${vehicle.year} - ${vehicle.color ?? 'N/A'}'),
+                          if (maintenances.isNotEmpty)
+                            Text(
+                              '${maintenances.length} manutenção(ões)',
+                              style: TextStyle(
+                                color: Theme.of(context).colorScheme.primary,
+                                fontSize: 12,
+                              ),
+                            ),
+                        ],
+                      ),
+                      trailing: const Icon(Icons.chevron_right),
+                      onTap: () async {
+                        final result = await Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => VehicleDetailPage(
+                              vehicleId: vehicle.id!,
+                              initialVehicle: vehicle,
+                            ),
+                          ),
+                        );
+                        if (result == true) {
+                          await context.read<VehicleRepository>().invalidate();
+                        }
+                      },
                     ),
                   );
-                  if (result == true) {
-                    _loadVehicles();
-                  }
                 },
               ),
-            );
-          },
-        ),
+            ),
+          ),
+        ],
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () async {
@@ -224,7 +237,7 @@ class _VehiclesPageState extends State<VehiclesPage> {
             ),
           );
           if (result == true) {
-            _loadVehicles();
+            await context.read<VehicleRepository>().invalidate();
           }
         },
         icon: const Icon(Icons.add),

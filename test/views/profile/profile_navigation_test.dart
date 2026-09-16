@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
+import 'package:vehicle_maintenance/repositories/vehicle_repository.dart';
 import 'package:vehicle_maintenance/services/api_service.dart';
 import 'package:vehicle_maintenance/services/auth_service.dart';
 import 'package:vehicle_maintenance/services/auth_token_storage.dart';
@@ -72,10 +73,15 @@ ApiService mockApiService() {
 }
 
 Widget buildProfileTestApp(AuthService authService) {
+  final apiService = mockApiService();
+
   return MultiProvider(
     providers: [
       Provider<AuthService>.value(value: authService),
-      Provider<ApiService>.value(value: mockApiService()),
+      Provider<ApiService>.value(value: apiService),
+      ChangeNotifierProvider<VehicleRepository>(
+        create: (_) => VehicleRepository(apiService),
+      ),
     ],
     child: MaterialApp(
       home: const HomePage(),
