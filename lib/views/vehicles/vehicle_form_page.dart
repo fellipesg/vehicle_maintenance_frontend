@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:dio/dio.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../models/vehicle.dart';
+import '../../repositories/vehicle_repository.dart';
 import '../../services/api_service.dart';
 import '../../widgets/vehicle_cover_avatar.dart';
 import '../../widgets/cover_framing.dart';
@@ -234,6 +235,7 @@ class _VehicleFormPageState extends State<VehicleFormPage> {
       }
 
       if (response.data['success'] == true && mounted) {
+        await context.read<VehicleRepository>().invalidate();
         Navigator.of(context).pop(true);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(

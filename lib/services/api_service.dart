@@ -1,6 +1,8 @@
 import 'package:dio/dio.dart';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
+
 import '../models/vehicle_lookup_result.dart';
 
 class ApiService {
@@ -17,10 +19,13 @@ class ApiService {
           connectTimeout: const Duration(seconds: 30),
           receiveTimeout: const Duration(seconds: 30),
         )) {
-    _dio.interceptors.add(LogInterceptor(
-      requestBody: true,
-      responseBody: true,
-    ));
+    if (kDebugMode) {
+      _dio.interceptors.add(LogInterceptor(
+        requestBody: false,
+        responseBody: false,
+        responseHeader: false,
+      ));
+    }
   }
 
   // Method to set authorization token
@@ -36,11 +41,23 @@ class ApiService {
   Dio get dio => _dio;
 
   // Get user's vehicles
-  Future<Response> getMyVehicles({int page = 1, int perPage = 15}) async {
-    return await _dio.get('/my-vehicles', queryParameters: {
-      'page': page,
-      'per_page': perPage,
-    });
+  Future<Response<dynamic>> getMyVehicles({
+    int page = 1,
+    int perPage = 15,
+    String? ifNoneMatch,
+  }) async {
+    return await _dio.get(
+      '/my-vehicles',
+      queryParameters: {
+        'page': page,
+        'per_page': perPage,
+      },
+      options: Options(
+        validateStatus: (status) =>
+            status != null && (status < 400 || status == 304),
+        headers: ifNoneMatch != null ? {'If-None-Match': ifNoneMatch} : null,
+      ),
+    );
   }
 
   // Vehicle endpoints
