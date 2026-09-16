@@ -13,6 +13,7 @@ class Workshop {
   final String neighborhood;
   final String city;
   final String state;
+  final String? logoUrl;
 
   Workshop({
     this.id,
@@ -29,6 +30,7 @@ class Workshop {
     required this.neighborhood,
     required this.city,
     required this.state,
+    this.logoUrl,
   });
 
   factory Workshop.fromJson(Map<String, dynamic> json) {
@@ -47,6 +49,7 @@ class Workshop {
       neighborhood: json['neighborhood'] as String,
       city: json['city'] as String,
       state: json['state'] as String,
+      logoUrl: json['logo_url'] as String?,
     );
   }
 

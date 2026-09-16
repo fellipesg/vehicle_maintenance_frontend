@@ -88,3 +88,13 @@ Se suas chaves foram expostas:
 5. Baixe o novo `google-services.json`
 6. Atualize os arquivos localmente
 7. Execute `flutterfire configure` novamente para atualizar `firebase_options.dart`
+
+## API de produção
+
+Para builds apontando ao backend em produção:
+
+```bash
+flutter run --dart-define=API_BASE_URL=https://revisalog.com.br/api/v1
+```
+
+O valor também está documentado em `.agent-api-url.txt`.

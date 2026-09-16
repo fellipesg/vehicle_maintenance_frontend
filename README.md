@@ -1,4 +1,4 @@
-# Vehicle Maintenance — Frontend (Flutter)
+# Revisalog — Frontend (Flutter)
 
 App Flutter para registro e consulta do histórico de manutenções veiculares, integrado à API Laravel.
 
@@ -40,9 +40,13 @@ A base URL é definida via `--dart-define` (recomendado) ou pelo valor padrão e
 | Simulador iOS | `http://127.0.0.1:8000/api/v1` |
 | Device físico | `http://<IP-da-sua-máquina>:8000/api/v1` |
 | Túnel (ngrok/cloudflare) | `https://<seu-host>/api/v1` |
+| Produção | `https://revisalog.com.br/api/v1` |
 
 ```bash
-flutter run --dart-define=API_BASE_URL=http://10.0.2.2:8000/api/v1
+flutter run --dart-define=API_BASE_URL=http://10.0.2.2:8081/api/v1
+
+# Produção
+flutter run --dart-define=API_BASE_URL=https://revisalog.com.br/api/v1
 ```
 
 > Em Android 9+, HTTP claro exige `usesCleartextTraffic` / network security config no emulador/dev. Em produção use HTTPS.
@@ -113,12 +117,17 @@ lib/
 
 ## Funcionalidades
 
-- Login / registro (API + OAuth quando habilitado no backend)
-- Cadastro e listagem de veículos
-- Registro de manutenções e itens
-- Upload de notas fiscais
-- Histórico e exportação (via API)
+- Login / registro (API + OAuth e 2FA quando habilitados no backend)
+- Cadastro e listagem de veículos com **chassi (VIN)** em destaque e chip da placa atual
+- **Histórico de placas** no detalhe do veículo (placa anterior pesquisável na API)
+- **Procedência** das manutenções: verificada (oficina) vs declarada (proprietário), com faixa de filtros na timeline
+- **Selo verificável** no detalhe da manutenção (código + QR → verificação pública no backend)
+- Registro de manutenções, itens, garantias e upload de NF-e
+- Timeline por quilometragem, busca por placa/RENAVAM e claim por CRLV
+- Exportação assíncrona de PDF e visualização no app
 - Notificações push (Firebase)
+
+Produção: [https://revisalog.com.br](https://revisalog.com.br) · API `https://revisalog.com.br/api/v1`
 
 ## Qualidade
 

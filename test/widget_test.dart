@@ -10,6 +10,7 @@ void main() {
       ),
     );
 
-    expect(find.text('Vehicle Maintenance'), findsOneWidget);
+    expect(find.byType(Image), findsOneWidget);
+    expect(find.text('Como você deseja entrar?'), findsOneWidget);
   });
 }

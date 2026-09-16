@@ -101,6 +101,51 @@ void main() {
       expect(prefs.getString('user_data'), isNull);
     });
 
+    test('login success persists token with full user payload', () async {
+      apiService.dio.interceptors.add(
+        InterceptorsWrapper(
+          onRequest: (options, handler) {
+            if (options.path == '/login' && options.method == 'POST') {
+              handler.resolve(
+                Response(
+                  requestOptions: options,
+                  data: {
+                    'success': true,
+                    'data': {
+                      'token': 'login-token',
+                      'token_type': 'Bearer',
+                      'user': {
+                        'id': 3,
+                        'email': 'fgoncalves2008@gmail.com',
+                        'user_type': 'user',
+                        'vehicles': [
+                          {'id': 1, 'license_plate': 'QOS6H54'},
+                        ],
+                      },
+                    },
+                    'message': 'Login successful',
+                  },
+                ),
+              );
+              return;
+            }
+
+            handler.next(options);
+          },
+        ),
+      );
+
+      final result = await authService.login(
+        'fgoncalves2008@gmail.com',
+        'password123',
+        portal: 'usuario',
+      );
+
+      expect(result, isA<LoginSuccess>());
+      expect(tokenStorage.token, 'login-token');
+      expect(authService.user?['email'], 'fgoncalves2008@gmail.com');
+    });
+
     test('loadStoredAuth keeps user profile in SharedPreferences', () async {
       SharedPreferences.setMockInitialValues({
         'user_data': '{"id":1,"name":"Test User"}',

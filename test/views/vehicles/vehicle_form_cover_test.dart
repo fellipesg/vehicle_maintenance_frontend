@@ -6,15 +6,25 @@ import 'package:vehicle_maintenance/widgets/cover_framing.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  test('cover framing is landscape 16:9', () {
-    expect(CoverFraming.aspectRatio, closeTo(16 / 9, 0.001));
-    expect(CoverFraming.title, 'Enquadrar capa');
+  test('landscape cover framing is 16:9', () {
+    expect(CoverFramingLandscape.aspectRatio, closeTo(16 / 9, 0.001));
+    expect(CoverFramingLandscape.title, 'Enquadrar capa — deitada');
   });
 
-  testWidgets('vehicle form asks to frame the cover photo', (tester) async {
+  test('portrait cover framing is 9:16', () {
+    expect(CoverFramingPortrait.aspectRatio, closeTo(9 / 16, 0.001));
+    expect(CoverFramingPortrait.title, 'Enquadrar capa — em pé');
+  });
+
+  testWidgets('vehicle form asks for landscape and portrait covers',
+      (tester) async {
     await tester.pumpWidget(const MaterialApp(home: VehicleFormPage()));
 
-    expect(find.text(CoverFraming.pickLabel), findsOneWidget);
-    expect(find.text(CoverFraming.hint), findsOneWidget);
+    expect(find.text(CoverFramingLandscape.pickLabel), findsOneWidget);
+    expect(find.text(CoverFramingPortrait.pickLabel), findsOneWidget);
+    expect(find.text(CoverFramingLandscape.hint), findsOneWidget);
+    expect(find.text(CoverFramingPortrait.hint), findsOneWidget);
+    expect(find.text('Capa paisagem (celular deitado)'), findsOneWidget);
+    expect(find.text('Capa retrato (celular em pé)'), findsOneWidget);
   });
 }

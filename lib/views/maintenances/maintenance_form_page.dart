@@ -5,7 +5,9 @@ import 'package:dio/dio.dart';
 import '../../models/maintenance.dart';
 import '../../models/maintenance_item.dart';
 import '../../models/workshop.dart';
+import '../../models/warranty_template.dart';
 import '../../services/api_service.dart';
+import '../../services/auth_service.dart';
 import 'maintenance_item_form_dialog.dart';
 import '../workshops/workshop_search_page.dart';
 
@@ -38,6 +40,10 @@ class _MaintenanceFormPageState extends State<MaintenanceFormPage> {
   List<MaintenanceItem> _items = [];
   List<String> _invoiceFiles = [];
   Workshop? _selectedWorkshop;
+  List<WarrantyTemplate> _orderWarrantyTemplates = [];
+  List<WarrantyTemplate> _itemWarrantyTemplates = [];
+  int? _generalWarrantyTemplateId;
+  bool _loadingWarrantyTemplates = false;
 
   final List<String> _maintenanceTypes = [
     'preventive',
@@ -75,18 +81,70 @@ class _MaintenanceFormPageState extends State<MaintenanceFormPage> {
     }
 
     _loadVehicleKilometers();
+    _loadWarrantyTemplatesIfWorkshop();
+  }
+
+  bool get _isWorkshopPortal {
+    final auth = Provider.of<AuthService>(context, listen: false);
+    return auth.isWorkshopUser;
+  }
+
+  String get _entityLabel => _isWorkshopPortal ? 'OS' : 'Manutenção';
+
+  Future<void> _loadWarrantyTemplatesIfWorkshop() async {
+    if (!_isWorkshopPortal) {
+      return;
+    }
+
+    final auth = Provider.of<AuthService>(context, listen: false);
+    final workshopId = auth.workshopId;
+    if (workshopId == null) {
+      return;
+    }
+
+    setState(() {
+      _loadingWarrantyTemplates = true;
+    });
+
+    try {
+      final apiService = Provider.of<ApiService>(context, listen: false);
+      final response =
+          await apiService.getWarrantyTemplates(workshopId.toString());
+
+      if (response.data['success'] == true && mounted) {
+        final templates = (response.data['data'] as List)
+            .map((json) => WarrantyTemplate.fromJson(json))
+            .where((template) => template.isActive)
+            .toList();
+
+        setState(() {
+          _orderWarrantyTemplates =
+              templates.where((t) => t.scope == 'order').toList();
+          _itemWarrantyTemplates =
+              templates.where((t) => t.scope == 'item').toList();
+        });
+      }
+    } catch (_) {
+      // Form remains usable without templates.
+    } finally {
+      if (mounted) {
+        setState(() {
+          _loadingWarrantyTemplates = false;
+        });
+      }
+    }
   }
 
   Future<void> _loadVehicleKilometers() async {
     try {
       final apiService = Provider.of<ApiService>(context, listen: false);
-      final response =
-          await apiService.getVehicle(widget.vehicleId.toString());
+      final response = await apiService.getVehicle(widget.vehicleId.toString());
 
       if (response.data['success'] == true && mounted) {
         final currentKm = response.data['data']['current_kilometers'];
         setState(() {
-          _minKilometers = currentKm is int ? currentKm : int.tryParse('$currentKm');
+          _minKilometers =
+              currentKm is int ? currentKm : int.tryParse('$currentKm');
           if (widget.maintenance == null &&
               _kilometersController.text.isEmpty &&
               _minKilometers != null) {
@@ -157,7 +215,10 @@ class _MaintenanceFormPageState extends State<MaintenanceFormPage> {
   Future<void> _addItem() async {
     final item = await showDialog<MaintenanceItem>(
       context: context,
-      builder: (_) => MaintenanceItemFormDialog(),
+      builder: (_) => MaintenanceItemFormDialog(
+        showWarrantyTemplates: _isWorkshopPortal,
+        itemWarrantyTemplates: _itemWarrantyTemplates,
+      ),
     );
 
     if (item != null) {
@@ -170,7 +231,11 @@ class _MaintenanceFormPageState extends State<MaintenanceFormPage> {
   void _editItem(int index) async {
     final item = await showDialog<MaintenanceItem>(
       context: context,
-      builder: (_) => MaintenanceItemFormDialog(item: _items[index]),
+      builder: (_) => MaintenanceItemFormDialog(
+        item: _items[index],
+        showWarrantyTemplates: _isWorkshopPortal,
+        itemWarrantyTemplates: _itemWarrantyTemplates,
+      ),
     );
 
     if (item != null) {
@@ -238,7 +303,7 @@ class _MaintenanceFormPageState extends State<MaintenanceFormPage> {
         return;
       }
 
-      final formData = FormData.fromMap({
+      final formDataMap = <String, dynamic>{
         'vehicle_id': widget.vehicleId,
         'workshop_id': _selectedWorkshop?.id,
         'maintenance_type': _maintenanceType,
@@ -255,7 +320,14 @@ class _MaintenanceFormPageState extends State<MaintenanceFormPage> {
             ? 1
             : 0, // Send as int to ensure boolean conversion
         'items': _items.map((item) => item.toJson()).toList(),
-      });
+      };
+
+      if (_isWorkshopPortal && _generalWarrantyTemplateId != null) {
+        formDataMap['general_warranty_template_id'] =
+            _generalWarrantyTemplateId;
+      }
+
+      final formData = FormData.fromMap(formDataMap);
 
       // Add invoice files
       for (var filePath in _invoiceFiles) {
@@ -311,8 +383,8 @@ class _MaintenanceFormPageState extends State<MaintenanceFormPage> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(widget.maintenance != null
-                ? 'Manutenção atualizada com sucesso!'
-                : 'Manutenção registrada com sucesso!'),
+                ? '$_entityLabel atualizada com sucesso!'
+                : '$_entityLabel registrada com sucesso!'),
             backgroundColor: Colors.green,
           ),
         );
@@ -345,8 +417,8 @@ class _MaintenanceFormPageState extends State<MaintenanceFormPage> {
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.maintenance != null
-            ? 'Editar Manutenção'
-            : 'Nova Manutenção'),
+            ? 'Editar $_entityLabel'
+            : 'Nova $_entityLabel'),
       ),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -436,44 +508,77 @@ class _MaintenanceFormPageState extends State<MaintenanceFormPage> {
                   },
                 ),
                 const SizedBox(height: 16),
-                // Oficina
-                InkWell(
-                  onTap: _selectWorkshop,
-                  child: InputDecorator(
-                    decoration: InputDecoration(
-                      labelText: 'Oficina',
-                      prefixIcon: const Icon(Icons.build_circle),
-                      suffixIcon: _selectedWorkshop != null
-                          ? IconButton(
-                              icon: const Icon(Icons.clear),
-                              onPressed: () {
-                                setState(() {
-                                  _selectedWorkshop = null;
-                                  _workshopNameController.clear();
-                                });
-                              },
-                            )
-                          : const Icon(Icons.search),
-                      border: const OutlineInputBorder(),
-                      helperText: _selectedWorkshop != null
-                          ? 'Toque para trocar de oficina'
-                          : 'Toque para buscar ou adicionar oficina',
+                if (_isWorkshopPortal) ...[
+                  if (_loadingWarrantyTemplates)
+                    const Padding(
+                      padding: EdgeInsets.only(bottom: 16),
+                      child: LinearProgressIndicator(),
                     ),
-                    child: Text(
-                      _selectedWorkshop != null
-                          ? _selectedWorkshop!.name
-                          : _workshopNameController.text.isEmpty
-                              ? 'Buscar oficina...'
-                              : _workshopNameController.text,
-                      style: TextStyle(
-                        color: _selectedWorkshop != null
-                            ? Theme.of(context).colorScheme.primary
-                            : null,
+                  DropdownButtonFormField<int?>(
+                    value: _generalWarrantyTemplateId,
+                    decoration: const InputDecoration(
+                      labelText: 'Garantia geral da OS',
+                      prefixIcon: Icon(Icons.verified_user),
+                      border: OutlineInputBorder(),
+                    ),
+                    items: [
+                      const DropdownMenuItem<int?>(
+                        value: null,
+                        child: Text('Sem garantia geral'),
+                      ),
+                      ..._orderWarrantyTemplates.map(
+                        (template) => DropdownMenuItem<int?>(
+                          value: template.id,
+                          child: Text(template.displayLabel),
+                        ),
+                      ),
+                    ],
+                    onChanged: (value) {
+                      setState(() {
+                        _generalWarrantyTemplateId = value;
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                ],
+                if (!_isWorkshopPortal)
+                  InkWell(
+                    onTap: _selectWorkshop,
+                    child: InputDecorator(
+                      decoration: InputDecoration(
+                        labelText: 'Oficina',
+                        prefixIcon: const Icon(Icons.build_circle),
+                        suffixIcon: _selectedWorkshop != null
+                            ? IconButton(
+                                icon: const Icon(Icons.clear),
+                                onPressed: () {
+                                  setState(() {
+                                    _selectedWorkshop = null;
+                                    _workshopNameController.clear();
+                                  });
+                                },
+                              )
+                            : const Icon(Icons.search),
+                        border: const OutlineInputBorder(),
+                        helperText: _selectedWorkshop != null
+                            ? 'Toque para trocar de oficina'
+                            : 'Toque para buscar ou adicionar oficina',
+                      ),
+                      child: Text(
+                        _selectedWorkshop != null
+                            ? _selectedWorkshop!.name
+                            : _workshopNameController.text.isEmpty
+                                ? 'Buscar oficina...'
+                                : _workshopNameController.text,
+                        style: TextStyle(
+                          color: _selectedWorkshop != null
+                              ? Theme.of(context).colorScheme.primary
+                              : null,
+                        ),
                       ),
                     ),
                   ),
-                ),
-                if (_selectedWorkshop != null) ...[
+                if (!_isWorkshopPortal && _selectedWorkshop != null) ...[
                   const SizedBox(height: 8),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16.0),
@@ -526,7 +631,7 @@ class _MaintenanceFormPageState extends State<MaintenanceFormPage> {
                 if (_items.isNotEmpty) ...[
                   const SizedBox(height: 16),
                   Text(
-                    'Itens da Manutenção (${_items.length})',
+                    '${_isWorkshopPortal ? 'Itens da OS' : 'Itens da Manutenção'} (${_items.length})',
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.bold,
                         ),

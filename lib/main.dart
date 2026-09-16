@@ -11,6 +11,9 @@ import 'views/auth/login_hub_page.dart';
 import 'services/api_service.dart';
 import 'services/auth_service.dart';
 
+const Color _brandNavy = Color(0xFF0B1C2C);
+const Color _brandTeal = Color(0xFF2EC4B6);
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   try {
@@ -37,7 +40,7 @@ class _MyAppState extends State<MyApp> {
   final ApiService _apiService = ApiService(
     baseUrl: const String.fromEnvironment(
       'API_BASE_URL',
-      defaultValue: 'http://10.0.2.2:8000/api/v1',
+      defaultValue: 'http://10.0.2.2:8081/api/v1',
     ),
   );
   late final AuthService _authService;
@@ -69,10 +72,12 @@ class _MyAppState extends State<MyApp> {
   Widget build(BuildContext context) {
     if (_isLoading) {
       return MaterialApp(
-        home: Scaffold(
+        theme: _brandTheme,
+        home: const Scaffold(
+          backgroundColor: _brandNavy,
           body: Center(
             child: CircularProgressIndicator(
-              color: Colors.blue.shade700,
+              color: _brandTeal,
             ),
           ),
         ),
@@ -86,25 +91,35 @@ class _MyAppState extends State<MyApp> {
       ],
       child: MaterialApp(
         navigatorKey: NotificationNavigation.navigatorKey,
-        title: 'Vehicle Maintenance',
+        title: 'Revisalog',
         debugShowCheckedModeBanner: false,
-        theme: ThemeData(
-          colorScheme: ColorScheme.fromSeed(
-            seedColor: Colors.blue,
-            primary: Colors.blue.shade700,
-            secondary: Colors.orange.shade600,
-          ),
-          useMaterial3: true,
-          appBarTheme: const AppBarTheme(
-            centerTitle: true,
-            elevation: 0,
-          ),
-        ),
-        home:
-            _authService.isAuthenticated
-                ? const HomePage()
-                : const LoginHubPage(),
+        theme: _brandTheme,
+        home: _authService.isAuthenticated
+            ? const HomePage()
+            : const LoginHubPage(),
       ),
     );
   }
 }
+
+final ThemeData _brandTheme = ThemeData(
+  useMaterial3: true,
+  scaffoldBackgroundColor: _brandNavy,
+  colorScheme: const ColorScheme(
+    brightness: Brightness.dark,
+    primary: _brandTeal,
+    onPrimary: _brandNavy,
+    secondary: _brandTeal,
+    onSecondary: _brandNavy,
+    surface: _brandNavy,
+    onSurface: Colors.white,
+    error: Colors.redAccent,
+    onError: Colors.white,
+  ),
+  appBarTheme: const AppBarTheme(
+    centerTitle: true,
+    elevation: 0,
+    backgroundColor: _brandNavy,
+    foregroundColor: Colors.white,
+  ),
+);

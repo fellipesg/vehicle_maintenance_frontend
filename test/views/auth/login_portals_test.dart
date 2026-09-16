@@ -134,11 +134,14 @@ void main() {
     });
 
     for (final portal in LoginPortal.values) {
-      testWidgets('navigates to ${portal.apiValue} login title', (tester) async {
+      testWidgets('navigates to ${portal.apiValue} login title',
+          (tester) async {
         await tester.pumpWidget(
           const MaterialApp(home: LoginHubPage()),
         );
 
+        await tester
+            .ensureVisible(find.byKey(Key('login_hub_portal_${portal.name}')));
         await tester.tap(find.byKey(Key('login_hub_portal_${portal.name}')));
         await tester.pumpAndSettle();
 

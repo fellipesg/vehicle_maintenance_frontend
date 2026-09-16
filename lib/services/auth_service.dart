@@ -20,7 +20,7 @@ class AuthService {
     this._apiService, {
     AuthTokenStorage? tokenStorage,
     FcmService? fcmService,
-  })  : _tokenStorage = tokenStorage ?? SecureAuthTokenStorage() {
+  }) : _tokenStorage = tokenStorage ?? SecureAuthTokenStorage() {
     _fcmService = fcmService ?? FcmService(_apiService);
   }
 
@@ -33,6 +33,19 @@ class AuthService {
   String? get token => _token;
   Map<String, dynamic>? get user => _user;
   bool get isAuthenticated => _token != null;
+
+  bool get isWorkshopUser => user?['user_type'] == 'workshop';
+
+  int? get workshopId {
+    final value = user?['workshop_id'];
+    if (value is int) {
+      return value;
+    }
+    if (value is String) {
+      return int.tryParse(value);
+    }
+    return null;
+  }
 
   Future<void> _saveToken(String token) async {
     _token = token;
@@ -204,8 +217,13 @@ class AuthService {
       return const LoginFailure();
     }
 
+    final user = tokenData['user'];
+    if (user is! Map) {
+      return const LoginFailure();
+    }
+
     await _saveToken(tokenData['token'].toString());
-    await _saveUser(Map<String, dynamic>.from(tokenData['user'] as Map));
+    await _saveUser(Map<String, dynamic>.from(user));
 
     _fcmService?.registerTokenAfterAuth();
 
@@ -273,9 +291,8 @@ class AuthService {
 
       final result = await _parseAuthResponse(response.data);
       if (result is LoginFailure) {
-        final message = response.data is Map
-            ? response.data['message']?.toString()
-            : null;
+        final message =
+            response.data is Map ? response.data['message']?.toString() : null;
         throw Exception(message ?? 'Erro ao processar login');
       }
 
@@ -349,7 +366,8 @@ class AuthService {
       });
 
       if (response.data['success'] == true) {
-        await _saveUser(Map<String, dynamic>.from(response.data['data'] as Map));
+        await _saveUser(
+            Map<String, dynamic>.from(response.data['data'] as Map));
         return true;
       }
 

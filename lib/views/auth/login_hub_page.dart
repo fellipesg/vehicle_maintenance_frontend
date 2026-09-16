@@ -9,6 +9,7 @@ class LoginHubPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFF0B1C2C),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
@@ -16,31 +17,28 @@ class LoginHubPage extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const SizedBox(height: 32),
-              Icon(
-                Icons.directions_car,
-                size: 64,
-                color: Theme.of(context).colorScheme.primary,
-              ),
-              const SizedBox(height: 16),
-              Text(
-                'Vehicle Maintenance',
-                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-                textAlign: TextAlign.center,
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Image.asset(
+                  'assets/brand/lockup-horizontal-tagline.png',
+                  height: 88,
+                  fit: BoxFit.contain,
+                  alignment: Alignment.centerLeft,
+                ),
               ),
               const SizedBox(height: 32),
               Text(
                 'Como você deseja entrar?',
                 style: Theme.of(context).textTheme.titleLarge?.copyWith(
                       fontWeight: FontWeight.w600,
+                      color: Colors.white,
                     ),
               ),
               const SizedBox(height: 8),
               Text(
                 'Escolha o portal correspondente ao seu perfil',
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Colors.grey.shade600,
+                      color: Colors.white70,
                     ),
               ),
               const SizedBox(height: 24),
@@ -64,14 +62,14 @@ class LoginHubPage extends StatelessWidget {
                 },
                 child: Text.rich(
                   TextSpan(
-                    style: TextStyle(color: Colors.grey.shade700),
+                    style: const TextStyle(color: Colors.white70),
                     children: const [
                       TextSpan(text: 'Não tem conta? '),
                       TextSpan(
                         text: 'Cadastre-se',
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
-                          color: Color(0xFF1D4ED8),
+                          color: Color(0xFF2EC4B6),
                         ),
                       ),
                     ],
@@ -94,7 +92,7 @@ class _PortalCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: portal.accent.withValues(alpha: 0.08),
+      color: const Color(0xFF132536),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
         side: BorderSide(color: portal.accent.withValues(alpha: 0.35)),
@@ -129,13 +127,14 @@ class _PortalCard extends StatelessWidget {
                       style: const TextStyle(
                         fontWeight: FontWeight.w600,
                         fontSize: 16,
+                        color: Colors.white,
                       ),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       portal.hubSubtitle,
-                      style: TextStyle(
-                        color: Colors.grey.shade600,
+                      style: const TextStyle(
+                        color: Colors.white70,
                         fontSize: 13,
                       ),
                     ),

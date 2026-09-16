@@ -205,7 +205,22 @@ class _WorkshopSearchPageState extends State<WorkshopSearchPage> {
                       vertical: 8,
                     ),
                     child: ListTile(
-                      leading: const Icon(Icons.build_circle, size: 40),
+                      leading: workshop.logoUrl != null &&
+                              workshop.logoUrl!.isNotEmpty
+                          ? ClipRRect(
+                              borderRadius: BorderRadius.circular(8),
+                              child: Image.network(
+                                workshop.logoUrl!,
+                                width: 40,
+                                height: 40,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) => const Icon(
+                                  Icons.build_circle,
+                                  size: 40,
+                                ),
+                              ),
+                            )
+                          : const Icon(Icons.build_circle, size: 40),
                       title: Text(
                         workshop.name,
                         style: const TextStyle(fontWeight: FontWeight.bold),

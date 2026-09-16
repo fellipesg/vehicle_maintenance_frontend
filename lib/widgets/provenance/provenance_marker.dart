@@ -32,27 +32,49 @@ class ProvenanceMarker extends StatelessWidget {
         .join();
   }
 
+  Widget _initialsText(Color color) {
+    return Text(
+      _initials,
+      style: TextStyle(
+        color: color,
+        fontSize: _dimension * 0.32,
+        fontWeight: FontWeight.w600,
+      ),
+    );
+  }
+
+  Widget _verifiedMarker() {
+    final hasLogo =
+        workshopLogoUrl != null && workshopLogoUrl!.trim().isNotEmpty;
+
+    return Container(
+      key: const Key('provenance_marker_verified'),
+      width: _dimension,
+      height: _dimension,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: hasLogo ? null : ProvenanceTheme.verifiedInk,
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: hasLogo
+          ? Image.network(
+              workshopLogoUrl!,
+              width: _dimension,
+              height: _dimension,
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => ColoredBox(
+                color: ProvenanceTheme.verifiedInk,
+                child: Center(child: _initialsText(Colors.white)),
+              ),
+            )
+          : Center(child: _initialsText(Colors.white)),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (isVerified) {
-      return CircleAvatar(
-        key: const Key('provenance_marker_verified'),
-        radius: _dimension / 2,
-        backgroundColor: ProvenanceTheme.verifiedInk,
-        backgroundImage: workshopLogoUrl != null && workshopLogoUrl!.isNotEmpty
-            ? NetworkImage(workshopLogoUrl!)
-            : null,
-        child: workshopLogoUrl == null || workshopLogoUrl!.isEmpty
-            ? Text(
-                _initials,
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: _dimension * 0.32,
-                  fontWeight: FontWeight.w600,
-                ),
-              )
-            : null,
-      );
+      return _verifiedMarker();
     }
 
     return Container(
@@ -68,14 +90,7 @@ class ProvenanceMarker extends StatelessWidget {
         ),
       ),
       alignment: Alignment.center,
-      child: Text(
-        _initials,
-        style: TextStyle(
-          color: ProvenanceTheme.declaredInk,
-          fontSize: _dimension * 0.32,
-          fontWeight: FontWeight.w600,
-        ),
-      ),
+      child: _initialsText(ProvenanceTheme.declaredInk),
     );
   }
 }

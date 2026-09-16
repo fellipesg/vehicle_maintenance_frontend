@@ -6,18 +6,47 @@ import 'package:image_cropper/image_cropper.dart';
 import 'cover_framing.dart';
 
 class CoverImageCropper {
-  Future<File?> crop(String sourcePath) async {
+  Future<File?> cropLandscape(String sourcePath) {
+    return crop(
+      sourcePath,
+      ratioX: CoverFramingLandscape.ratioX,
+      ratioY: CoverFramingLandscape.ratioY,
+      title: CoverFramingLandscape.title,
+      maxWidth: CoverFramingLandscape.maxWidth,
+      compressQuality: CoverFramingLandscape.compressQuality,
+    );
+  }
+
+  Future<File?> cropPortrait(String sourcePath) {
+    return crop(
+      sourcePath,
+      ratioX: CoverFramingPortrait.ratioX,
+      ratioY: CoverFramingPortrait.ratioY,
+      title: CoverFramingPortrait.title,
+      maxWidth: CoverFramingPortrait.maxWidth,
+      compressQuality: CoverFramingPortrait.compressQuality,
+    );
+  }
+
+  Future<File?> crop(
+    String sourcePath, {
+    required double ratioX,
+    required double ratioY,
+    required String title,
+    required int maxWidth,
+    required int compressQuality,
+  }) async {
     final cropped = await ImageCropper().cropImage(
       sourcePath: sourcePath,
-      aspectRatio: const CropAspectRatio(
-        ratioX: CoverFraming.ratioX,
-        ratioY: CoverFraming.ratioY,
+      aspectRatio: CropAspectRatio(
+        ratioX: ratioX,
+        ratioY: ratioY,
       ),
-      maxWidth: CoverFraming.maxWidth,
-      compressQuality: CoverFraming.compressQuality,
+      maxWidth: maxWidth,
+      compressQuality: compressQuality,
       uiSettings: [
         AndroidUiSettings(
-          toolbarTitle: CoverFraming.title,
+          toolbarTitle: title,
           toolbarColor: const Color(0xFFC9956A),
           toolbarWidgetColor: const Color(0xFF141210),
           lockAspectRatio: true,
@@ -25,9 +54,9 @@ class CoverImageCropper {
           aspectRatioPresets: [CropAspectRatioPreset.ratio16x9],
         ),
         IOSUiSettings(
-          title: CoverFraming.title,
-          doneButtonTitle: CoverFraming.confirmLabel,
-          cancelButtonTitle: CoverFraming.cancelLabel,
+          title: title,
+          doneButtonTitle: CoverFramingLandscape.confirmLabel,
+          cancelButtonTitle: CoverFramingLandscape.cancelLabel,
           aspectRatioLockEnabled: true,
           resetAspectRatioEnabled: false,
           aspectRatioPickerButtonHidden: true,
@@ -42,4 +71,7 @@ class CoverImageCropper {
 
     return File(cropped.path);
   }
+
+  /// Backward-compatible alias.
+  Future<File?> cropLegacy(String sourcePath) => cropLandscape(sourcePath);
 }

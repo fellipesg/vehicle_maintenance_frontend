@@ -1,8 +1,11 @@
-import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import 'package:http/http.dart' as http;
-import 'package:dio/dio.dart';
 import 'dart:convert';
+import 'dart:io';
+
+import 'package:dio/dio.dart';
+import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'package:image_picker/image_picker.dart';
+import 'package:provider/provider.dart';
 import '../../models/workshop.dart';
 import '../../services/api_service.dart';
 
@@ -33,6 +36,9 @@ class _WorkshopFormPageState extends State<WorkshopFormPage> {
 
   bool _isLoading = false;
   bool _isLoadingCep = false;
+  final ImagePicker _imagePicker = ImagePicker();
+  File? _logoFile;
+  String? _logoPreviewUrl;
 
   @override
   void initState() {
@@ -76,6 +82,22 @@ class _WorkshopFormPageState extends State<WorkshopFormPage> {
     _neighborhoodController.text = workshop.neighborhood;
     _cityController.text = workshop.city;
     _stateController.text = workshop.state;
+    _logoPreviewUrl = workshop.logoUrl;
+  }
+
+  Future<void> _pickLogo() async {
+    final picked = await _imagePicker.pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 1200,
+      imageQuality: 85,
+    );
+
+    if (picked != null) {
+      setState(() {
+        _logoFile = File(picked.path);
+        _logoPreviewUrl = picked.path;
+      });
+    }
   }
 
   void _onCepChanged() {
@@ -135,7 +157,7 @@ class _WorkshopFormPageState extends State<WorkshopFormPage> {
     try {
       final apiService = Provider.of<ApiService>(context, listen: false);
 
-      final data = {
+      final formData = FormData.fromMap({
         'name': _nameController.text.trim(),
         'phone': _phoneController.text.trim(),
         'whatsapp': _whatsappController.text.trim().isEmpty
@@ -159,16 +181,21 @@ class _WorkshopFormPageState extends State<WorkshopFormPage> {
         'neighborhood': _neighborhoodController.text.trim(),
         'city': _cityController.text.trim(),
         'state': _stateController.text.trim().toUpperCase(),
-      };
+        if (_logoFile != null)
+          'logo': await MultipartFile.fromFile(
+            _logoFile!.path,
+            filename: _logoFile!.path.split('/').last,
+          ),
+      });
 
       Response response;
       if (widget.workshop != null) {
         response = await apiService.updateWorkshop(
           widget.workshop!.id.toString(),
-          data,
+          formData,
         );
       } else {
-        response = await apiService.createWorkshop(data);
+        response = await apiService.createWorkshop(formData);
       }
 
       if (response.data['success'] == true && mounted) {
@@ -224,7 +251,47 @@ class _WorkshopFormPageState extends State<WorkshopFormPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // Nome
+                Center(
+                  child: Column(
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: _logoPreviewUrl != null
+                            ? (_logoFile != null
+                                ? Image.file(
+                                    _logoFile!,
+                                    width: 96,
+                                    height: 96,
+                                    fit: BoxFit.cover,
+                                  )
+                                : Image.network(
+                                    _logoPreviewUrl!,
+                                    width: 96,
+                                    height: 96,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (_, __, ___) => Icon(
+                                      Icons.build_circle,
+                                      size: 96,
+                                      color:
+                                          Theme.of(context).colorScheme.primary,
+                                    ),
+                                  ))
+                            : Icon(
+                                Icons.build_circle,
+                                size: 96,
+                                color: Theme.of(context).colorScheme.primary,
+                              ),
+                      ),
+                      const SizedBox(height: 8),
+                      OutlinedButton.icon(
+                        onPressed: _pickLogo,
+                        icon: const Icon(Icons.image),
+                        label: const Text('Selecionar logo'),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
                 TextFormField(
                   controller: _nameController,
                   decoration: const InputDecoration(

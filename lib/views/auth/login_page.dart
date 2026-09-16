@@ -72,8 +72,7 @@ class _LoginPageState extends State<LoginPage> {
         case LoginFailure():
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content:
-                  Text('Erro ao fazer login. Verifique suas credenciais.'),
+              content: Text('Erro ao fazer login. Verifique suas credenciais.'),
               backgroundColor: Colors.red,
             ),
           );
@@ -103,6 +102,11 @@ class _LoginPageState extends State<LoginPage> {
     }
     if (raw.contains('401') || raw.contains('Invalid login')) {
       return 'Credenciais inválidas.';
+    }
+    if (raw.contains('SecureStorage') ||
+        raw.contains('Keychain') ||
+        raw.contains('OSStatus')) {
+      return 'Login ok na API, mas falhou ao salvar a sessão neste dispositivo. Tente novamente.';
     }
     return raw;
   }
@@ -286,7 +290,7 @@ class _LoginPageState extends State<LoginPage> {
                         )
                       : const Text('Entrar'),
                 ),
-                if (_portal != LoginPortal.admin) ...[
+                if (_portal.supportsSocialLogin) ...[
                   const SizedBox(height: 24),
                   Row(
                     children: [

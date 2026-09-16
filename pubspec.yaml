@@ -56,11 +56,9 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
-  
-  # Assets commented out until they are created
-  # assets:
-  #   - assets/images/
-  #   - assets/fonts/
+
+  assets:
+    - assets/brand/
   
   # fonts:
   #   - family: Roboto

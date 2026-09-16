@@ -48,9 +48,8 @@ class _TwoFactorChallengePageState extends State<TwoFactorChallengePage> {
       final success = await authService.completeTwoFactorChallenge(
         challengeToken: widget.challengeToken,
         code: _showRecoveryCode ? null : code,
-        recoveryCode: _showRecoveryCode && recoveryCode.isNotEmpty
-            ? recoveryCode
-            : null,
+        recoveryCode:
+            _showRecoveryCode && recoveryCode.isNotEmpty ? recoveryCode : null,
       );
 
       if (success && mounted) {

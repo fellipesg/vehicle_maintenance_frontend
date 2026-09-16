@@ -1,13 +1,22 @@
 import 'package:flutter/material.dart';
 import '../../models/maintenance_item.dart';
+import '../../models/warranty_template.dart';
 
 class MaintenanceItemFormDialog extends StatefulWidget {
   final MaintenanceItem? item;
+  final List<WarrantyTemplate> itemWarrantyTemplates;
+  final bool showWarrantyTemplates;
 
-  const MaintenanceItemFormDialog({super.key, this.item});
+  const MaintenanceItemFormDialog({
+    super.key,
+    this.item,
+    this.itemWarrantyTemplates = const [],
+    this.showWarrantyTemplates = false,
+  });
 
   @override
-  State<MaintenanceItemFormDialog> createState() => _MaintenanceItemFormDialogState();
+  State<MaintenanceItemFormDialog> createState() =>
+      _MaintenanceItemFormDialogState();
 }
 
 class _MaintenanceItemFormDialogState extends State<MaintenanceItemFormDialog> {
@@ -17,6 +26,7 @@ class _MaintenanceItemFormDialogState extends State<MaintenanceItemFormDialog> {
   final _quantityController = TextEditingController();
   final _unitPriceController = TextEditingController();
   final _partNumberController = TextEditingController();
+  int? _selectedWarrantyTemplateId;
 
   @override
   void initState() {
@@ -27,6 +37,7 @@ class _MaintenanceItemFormDialogState extends State<MaintenanceItemFormDialog> {
       _quantityController.text = widget.item!.quantity.toString();
       _unitPriceController.text = widget.item!.unitPrice.toStringAsFixed(2);
       _partNumberController.text = widget.item!.partNumber ?? '';
+      _selectedWarrantyTemplateId = widget.item!.warrantyTemplateId;
     } else {
       _quantityController.text = '1';
       _unitPriceController.text = '0.00';
@@ -41,12 +52,6 @@ class _MaintenanceItemFormDialogState extends State<MaintenanceItemFormDialog> {
     _unitPriceController.dispose();
     _partNumberController.dispose();
     super.dispose();
-  }
-
-  void _calculateTotal() {
-    final quantity = int.tryParse(_quantityController.text) ?? 0;
-    final unitPrice = double.tryParse(_unitPriceController.text) ?? 0.0;
-    // Total is calculated automatically in the model
   }
 
   void _handleSubmit() {
@@ -70,6 +75,7 @@ class _MaintenanceItemFormDialogState extends State<MaintenanceItemFormDialog> {
       partNumber: _partNumberController.text.trim().isEmpty
           ? null
           : _partNumberController.text.trim(),
+      warrantyTemplateId: _selectedWarrantyTemplateId,
     );
 
     Navigator.of(context).pop(item);
@@ -118,7 +124,6 @@ class _MaintenanceItemFormDialogState extends State<MaintenanceItemFormDialog> {
                         border: OutlineInputBorder(),
                       ),
                       keyboardType: TextInputType.number,
-                      onChanged: (_) => _calculateTotal(),
                       validator: (value) {
                         if (value == null || value.isEmpty) {
                           return 'Obrigatório';
@@ -140,8 +145,8 @@ class _MaintenanceItemFormDialogState extends State<MaintenanceItemFormDialog> {
                         border: OutlineInputBorder(),
                         prefixText: 'R\$ ',
                       ),
-                      keyboardType: TextInputType.numberWithOptions(decimal: true),
-                      onChanged: (_) => _calculateTotal(),
+                      keyboardType:
+                          const TextInputType.numberWithOptions(decimal: true),
                       validator: (value) {
                         if (value == null || value.isEmpty) {
                           return 'Obrigatório';
@@ -164,6 +169,33 @@ class _MaintenanceItemFormDialogState extends State<MaintenanceItemFormDialog> {
                   border: OutlineInputBorder(),
                 ),
               ),
+              if (widget.showWarrantyTemplates) ...[
+                const SizedBox(height: 16),
+                DropdownButtonFormField<int?>(
+                  value: _selectedWarrantyTemplateId,
+                  decoration: const InputDecoration(
+                    labelText: 'Garantia do item',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: [
+                    const DropdownMenuItem<int?>(
+                      value: null,
+                      child: Text('Sem garantia'),
+                    ),
+                    ...widget.itemWarrantyTemplates.map(
+                      (template) => DropdownMenuItem<int?>(
+                        value: template.id,
+                        child: Text(template.displayLabel),
+                      ),
+                    ),
+                  ],
+                  onChanged: (value) {
+                    setState(() {
+                      _selectedWarrantyTemplateId = value;
+                    });
+                  },
+                ),
+              ],
             ],
           ),
         ),
@@ -181,4 +213,3 @@ class _MaintenanceItemFormDialogState extends State<MaintenanceItemFormDialog> {
     );
   }
 }
-
