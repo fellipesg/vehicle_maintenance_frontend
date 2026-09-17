@@ -14,6 +14,8 @@ class ProvenanceStrip extends StatelessWidget {
     this.onFilterChanged,
   });
 
+  static const int _maxVisibleDots = 16;
+
   final List<ProvenanceSegment> segments;
   final int totalMaintenances;
   final int verifiedCount;
@@ -25,33 +27,66 @@ class ProvenanceStrip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final visible = segments.take(_maxVisibleDots).toList();
+    final overflow = segments.length - visible.length;
+    final declaredLabel = _declaredCount == 1 ? 'declarada' : 'declaradas';
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        SizedBox(
-          height: ProvenanceTheme.stripHeight,
-          child: CustomPaint(
-            painter: _StripPainter(segments: segments),
-            child: Row(
-              children: [
-                for (var i = 0; i < segments.length; i++)
-                  Expanded(
-                    child: GestureDetector(
-                      key: Key('provenance_strip_segment_$i'),
-                      behavior: HitTestBehavior.opaque,
-                      onTap: () =>
-                          onTapSegment?.call(segments[i].maintenanceId),
-                    ),
-                  ),
-              ],
+        Text.rich(
+          TextSpan(
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: const Color(0xFF374151),
             ),
+            children: [
+              TextSpan(
+                text: '$verifiedCount',
+                style: const TextStyle(
+                  fontWeight: FontWeight.w600,
+                  color: ProvenanceTheme.verifiedInk,
+                ),
+              ),
+              const TextSpan(text: ' com selo · '),
+              TextSpan(
+                text: '$_declaredCount',
+                style: const TextStyle(
+                  fontWeight: FontWeight.w600,
+                  color: ProvenanceTheme.declaredInk,
+                ),
+              ),
+              TextSpan(text: ' $declaredLabel'),
+            ],
           ),
         ),
-        const SizedBox(height: 8),
-        Text(
-          '$totalMaintenances manutenções · $verifiedCount com selo de oficina · $_declaredCount declaradas',
-          style: Theme.of(context).textTheme.bodySmall,
-        ),
+        if (visible.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: ProvenanceTheme.dotGap,
+            runSpacing: ProvenanceTheme.dotGap,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              for (var i = 0; i < visible.length; i++)
+                _ProvenanceDot(
+                  key: Key('provenance_strip_segment_$i'),
+                  segment: visible[i],
+                  onTap: onTapSegment == null
+                      ? null
+                      : () => onTapSegment!(visible[i].maintenanceId),
+                ),
+              if (overflow > 0)
+                Text(
+                  '+$overflow',
+                  key: const Key('provenance_strip_overflow'),
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: const Color(0xFF6B7280),
+                  ),
+                ),
+            ],
+          ),
+        ],
         const SizedBox(height: 8),
         Wrap(
           spacing: 8,
@@ -81,43 +116,84 @@ class ProvenanceStrip extends StatelessWidget {
   }
 }
 
-class _StripPainter extends CustomPainter {
-  _StripPainter({required this.segments});
+class _ProvenanceDot extends StatelessWidget {
+  const _ProvenanceDot({
+    super.key,
+    required this.segment,
+    this.onTap,
+  });
 
-  final List<ProvenanceSegment> segments;
+  final ProvenanceSegment segment;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: onTap != null,
+      label: segment.isVerified ? 'Selo da oficina' : 'Declarada',
+      child: GestureDetector(
+        onTap: onTap,
+        behavior: HitTestBehavior.opaque,
+        child: CustomPaint(
+          painter: _ProvenanceDotPainter(isVerified: segment.isVerified),
+          size: const Size(
+            ProvenanceTheme.dotSize,
+            ProvenanceTheme.dotSize,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ProvenanceDotPainter extends CustomPainter {
+  _ProvenanceDotPainter({required this.isVerified});
+
+  final bool isVerified;
 
   @override
   void paint(Canvas canvas, Size size) {
-    if (segments.isEmpty) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = size.width / 2;
+
+    if (isVerified) {
+      canvas.drawCircle(
+        center,
+        radius,
+        Paint()..color = ProvenanceTheme.verifiedInk,
+      );
       return;
     }
 
-    final segmentWidth = size.width / segments.length;
-    for (var i = 0; i < segments.length; i++) {
-      final rect = Rect.fromLTWH(i * segmentWidth + (i > 0 ? 0.5 : 0), 0,
-          segmentWidth - 0.5, size.height);
-      if (segments[i].isVerified) {
-        canvas.drawRect(rect, Paint()..color = ProvenanceTheme.verifiedInk);
-      } else {
-        final paint = Paint()..color = const Color(0xFFF59E0B);
-        canvas.save();
-        canvas.clipRect(rect);
-        const spacing = 4.0;
-        for (double x = -size.height;
-            x < rect.width + size.height;
-            x += spacing) {
-          canvas.drawLine(
-            Offset(rect.left + x, rect.top),
-            Offset(rect.left + x + size.height, rect.bottom),
-            paint..strokeWidth = 1,
-          );
-        }
-        canvas.restore();
-      }
+    canvas.drawCircle(
+      center,
+      radius - 1,
+      Paint()
+        ..color = ProvenanceTheme.declaredSurface
+        ..style = PaintingStyle.fill,
+    );
+
+    final borderPaint = Paint()
+      ..color = ProvenanceTheme.declaredInk
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.5;
+
+    const dashCount = 12;
+    const twoPi = 3.141592653589793 * 2;
+    for (var i = 0; i < dashCount; i++) {
+      final startAngle = (i / dashCount) * twoPi;
+      final sweep = (twoPi / dashCount) * 0.45;
+      canvas.drawArc(
+        Rect.fromCircle(center: center, radius: radius - 1),
+        startAngle,
+        sweep,
+        false,
+        borderPaint,
+      );
     }
   }
 
   @override
-  bool shouldRepaint(covariant _StripPainter oldDelegate) =>
-      oldDelegate.segments != segments;
+  bool shouldRepaint(covariant _ProvenanceDotPainter oldDelegate) =>
+      oldDelegate.isVerified != isVerified;
 }

@@ -4,7 +4,7 @@ import 'package:vehicle_maintenance/models/provenance_segment.dart';
 import 'package:vehicle_maintenance/widgets/provenance/provenance_strip.dart';
 
 void main() {
-  testWidgets('renders one segment per maintenance', (tester) async {
+  testWidgets('renders compact summary and one dot per visible segment', (tester) async {
     final segments = [
       ProvenanceSegment(
           maintenanceId: 1, date: DateTime(2024, 1, 1), isVerified: true),
@@ -32,7 +32,8 @@ void main() {
 
     expect(find.byKey(const Key('provenance_strip_segment_0')), findsOneWidget);
     expect(find.byKey(const Key('provenance_strip_segment_4')), findsOneWidget);
-    expect(find.textContaining('5 manutenções'), findsOneWidget);
+    expect(find.textContaining('3 com selo'), findsOneWidget);
+    expect(find.textContaining('2 declaradas'), findsOneWidget);
   });
 
   testWidgets('tap on second segment calls callback with id', (tester) async {
@@ -61,6 +62,34 @@ void main() {
     await tester.pump();
 
     expect(tappedId, 20);
+  });
+
+  testWidgets('shows overflow when more than sixteen segments', (tester) async {
+    final segments = List.generate(
+      17,
+      (i) => ProvenanceSegment(
+        maintenanceId: i + 1,
+        date: DateTime(2024, 1, i + 1),
+        isVerified: true,
+      ),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: ProvenanceStrip(
+            segments: segments,
+            totalMaintenances: 17,
+            verifiedCount: 17,
+          ),
+        ),
+      ),
+    );
+
+    expect(find.byKey(const Key('provenance_strip_segment_15')), findsOneWidget);
+    expect(find.byKey(const Key('provenance_strip_segment_16')), findsNothing);
+    expect(find.byKey(const Key('provenance_strip_overflow')), findsOneWidget);
+    expect(find.text('+1'), findsOneWidget);
   });
 
   testWidgets('filter chips invoke onFilterChanged', (tester) async {

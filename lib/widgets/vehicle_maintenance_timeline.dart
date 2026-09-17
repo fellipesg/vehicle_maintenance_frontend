@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import '../models/maintenance.dart';
+import '../theme/provenance.dart';
 import 'provenance/provenance_card.dart';
 import 'provenance/provenance_marker.dart';
 import 'provenance/provenance_rail.dart';
@@ -313,7 +314,7 @@ class _TimelineRow extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.only(top: 4),
             child: SizedBox(
-              width: 28,
+              width: ProvenanceTheme.markerSizeLg,
               child: Column(
                 children: [
                   if (isMaintenance)
@@ -321,7 +322,7 @@ class _TimelineRow extends StatelessWidget {
                       isVerified: maintenance.isVerified,
                       workshopLogoUrl: maintenance.verifiedWorkshop?.logoUrl,
                       workshopName: maintenance.workshopName,
-                      size: ProvenanceMarkerSize.sm,
+                      size: ProvenanceMarkerSize.lg,
                     )
                   else
                     Container(

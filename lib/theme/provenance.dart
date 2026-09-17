@@ -16,10 +16,12 @@ abstract final class ProvenanceTheme {
   static const Color declaredBody = Color(0xFF374151);
   static const Color declaredMeta = Color(0xFF6B7280);
 
-  static const double markerSize = 28;
-  static const double markerSizeSm = 20;
+  static const double markerSize = 36;
+  static const double markerSizeSm = 24;
+  static const double markerSizeLg = 44;
+  static const double dotSize = 10;
+  static const double dotGap = 4;
   static const double railWidth = 3;
-  static const double stripHeight = 8;
   static const double dashLength = 6;
   static const double dashGap = 4;
 
