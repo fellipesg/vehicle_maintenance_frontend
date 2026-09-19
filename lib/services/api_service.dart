@@ -40,7 +40,7 @@ class ApiService {
   // Getter for dio (for AuthService and other services)
   Dio get dio => _dio;
 
-  // Get user's vehicles
+  // Get user's vehicles (or all vehicles for admin)
   Future<Response<dynamic>> getMyVehicles({
     int page = 1,
     int perPage = 15,
@@ -57,6 +57,19 @@ class ApiService {
             status != null && (status < 400 || status == 304),
         headers: ifNoneMatch != null ? {'If-None-Match': ifNoneMatch} : null,
       ),
+    );
+  }
+
+  Future<Response<dynamic>> getAdminVehicles({
+    int page = 1,
+    int perPage = 50,
+  }) async {
+    return await _dio.get(
+      '/admin/vehicles',
+      queryParameters: {
+        'page': page,
+        'per_page': perPage,
+      },
     );
   }
 

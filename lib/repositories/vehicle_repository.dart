@@ -14,6 +14,7 @@ class VehicleRepository extends ChangeNotifier {
   final ApiService _apiService;
 
   List<Vehicle> _vehicles = [];
+  bool _adminMode = false;
   bool _isRefreshing = false;
   DateTime? _lastSyncedAt;
   String? _etag;
@@ -30,6 +31,17 @@ class VehicleRepository extends ChangeNotifier {
 
   bool get hasCachedVehicles => _vehicles.isNotEmpty;
 
+  bool get isAdminMode => _adminMode;
+
+  void setAdminMode(bool enabled) {
+    if (_adminMode == enabled) {
+      return;
+    }
+    _adminMode = enabled;
+    _etag = null;
+    notifyListeners();
+  }
+
   Future<void> load({bool force = false}) async {
     _error = null;
 
@@ -42,11 +54,13 @@ class VehicleRepository extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final response = await _apiService.getMyVehicles(
-        ifNoneMatch: force ? null : _etag,
-      );
+      final response = _adminMode
+          ? await _apiService.getAdminVehicles()
+          : await _apiService.getMyVehicles(
+              ifNoneMatch: force ? null : _etag,
+            );
 
-      if (response.statusCode == 304) {
+      if (!_adminMode && response.statusCode == 304) {
         _lastSyncedAt = DateTime.now();
         return;
       }
@@ -62,8 +76,10 @@ class VehicleRepository extends ChangeNotifier {
                     ))
                 .toList();
           }
-          _etag =
-              response.headers.value('etag') ?? response.headers.value('ETag');
+          _etag = !_adminMode
+              ? (response.headers.value('etag') ??
+                  response.headers.value('ETag'))
+              : null;
           _lastSyncedAt = DateTime.now();
           await _persistSnapshot();
         }
@@ -87,6 +103,7 @@ class VehicleRepository extends ChangeNotifier {
     _lastSyncedAt = null;
     _error = null;
     _hydratedFromSnapshot = false;
+    _adminMode = false;
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_snapshotKey);
     notifyListeners();

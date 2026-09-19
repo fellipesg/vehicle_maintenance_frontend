@@ -38,6 +38,8 @@ class AuthService {
 
   bool get isWorkshopUser => user?['user_type'] == 'workshop';
 
+  bool get isAdmin => user?['is_admin'] == true;
+
   int? get workshopId {
     final value = user?['workshop_id'];
     if (value is int) {
@@ -63,6 +65,7 @@ class AuthService {
     _user = user;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_userKey, jsonEncode(user));
+    vehicleRepository?.setAdminMode(isAdmin);
   }
 
   Future<void> _migrateLegacyTokenIfNeeded(SharedPreferences prefs) async {
@@ -92,6 +95,7 @@ class AuthService {
 
     if (userStr != null) {
       _user = jsonDecode(userStr);
+      vehicleRepository?.setAdminMode(isAdmin);
     }
   }
 

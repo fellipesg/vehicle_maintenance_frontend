@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../../services/auth_service.dart';
 import '../../models/vehicle.dart';
 import '../../repositories/vehicle_repository.dart';
+import '../../widgets/revisalog_lockup.dart';
 import '../../widgets/user_avatar.dart';
 import '../../widgets/vehicle_cover_avatar.dart';
 import '../../widgets/vehicle_identity.dart';
@@ -21,38 +22,65 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   int _selectedIndex = 0;
+  bool _vehiclesListScrolled = false;
 
   final List<Widget> _pages = [
     const VehiclesPage(key: PageStorageKey('vehicles-tab')),
     const ProfilePage(),
   ];
 
+  static const Color _brandNavy = Color(0xFF0B1C2C);
+
+  bool _onScrollNotification(ScrollNotification notification) {
+    if (_selectedIndex != 0) {
+      return false;
+    }
+
+    if (notification is ScrollUpdateNotification ||
+        notification is ScrollEndNotification) {
+      final scrolled = notification.metrics.pixels > 0;
+      if (scrolled != _vehiclesListScrolled) {
+        setState(() => _vehiclesListScrolled = scrolled);
+      }
+    }
+
+    return false;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Align(
+        title: const Align(
           alignment: Alignment.centerLeft,
-          child: Image.asset(
-            'assets/brand/lockup-horizontal.png',
-            height: 32,
-            fit: BoxFit.contain,
-            alignment: Alignment.centerLeft,
-          ),
+          child: RevisalogLockupHorizontal(height: 32),
         ),
         centerTitle: false,
-        backgroundColor: const Color(0xFF0B1C2C),
+        backgroundColor: _brandNavy,
         foregroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        scrolledUnderElevation: 0,
+        shape: _vehiclesListScrolled
+            ? const Border(
+                bottom: BorderSide(color: Color(0x332EC4B6), width: 1),
+              )
+            : null,
       ),
-      body: IndexedStack(
-        index: _selectedIndex,
-        children: _pages,
+      body: NotificationListener<ScrollNotification>(
+        onNotification: _onScrollNotification,
+        child: IndexedStack(
+          index: _selectedIndex,
+          children: _pages,
+        ),
       ),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _selectedIndex,
         onTap: (index) {
           setState(() {
             _selectedIndex = index;
+            if (index != 0) {
+              _vehiclesListScrolled = false;
+            }
           });
         },
         items: const [
@@ -121,6 +149,8 @@ class _VehiclesPageState extends State<VehiclesPage> {
     VehicleRepository repository,
     List<Vehicle> vehicles,
   ) {
+    final isAdmin = context.watch<AuthService>().isAdmin;
+
     if (vehicles.isEmpty) {
       return Center(
         child: Column(
@@ -133,31 +163,37 @@ class _VehiclesPageState extends State<VehiclesPage> {
             ),
             const SizedBox(height: 16),
             Text(
-              'Nenhum veículo cadastrado',
+              isAdmin
+                  ? 'Nenhum veículo na plataforma'
+                  : 'Nenhum veículo cadastrado',
               style: Theme.of(context).textTheme.headlineSmall,
             ),
             const SizedBox(height: 8),
             Text(
-              'Adicione um veículo para começar',
+              isAdmin
+                  ? 'Quando houver cadastros, eles aparecerão aqui'
+                  : 'Adicione um veículo para começar',
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: Colors.grey.shade600,
                   ),
             ),
-            const SizedBox(height: 24),
-            ElevatedButton.icon(
-              onPressed: () async {
-                final result = await Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => const VehicleFormPage(),
-                  ),
-                );
-                if (result == true) {
-                  await context.read<VehicleRepository>().invalidate();
-                }
-              },
-              icon: const Icon(Icons.add),
-              label: const Text('Adicionar Veículo'),
-            ),
+            if (!isAdmin) ...[
+              const SizedBox(height: 24),
+              ElevatedButton.icon(
+                onPressed: () async {
+                  final result = await Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const VehicleFormPage(),
+                    ),
+                  );
+                  if (result == true) {
+                    await context.read<VehicleRepository>().invalidate();
+                  }
+                },
+                icon: const Icon(Icons.add),
+                label: const Text('Adicionar Veículo'),
+              ),
+            ],
           ],
         ),
       );
@@ -166,6 +202,19 @@ class _VehiclesPageState extends State<VehiclesPage> {
     return Scaffold(
       body: Column(
         children: [
+          if (isAdmin)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'Todos os veículos',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                ),
+              ),
+            ),
           if (repository.isRefreshing && vehicles.isNotEmpty)
             const LinearProgressIndicator(minHeight: 2),
           Expanded(
@@ -229,20 +278,22 @@ class _VehiclesPageState extends State<VehiclesPage> {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () async {
-          final result = await Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (_) => const VehicleFormPage(),
+      floatingActionButton: isAdmin
+          ? null
+          : FloatingActionButton.extended(
+              onPressed: () async {
+                final result = await Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => const VehicleFormPage(),
+                  ),
+                );
+                if (result == true) {
+                  await context.read<VehicleRepository>().invalidate();
+                }
+              },
+              icon: const Icon(Icons.add),
+              label: const Text('Adicionar Veículo'),
             ),
-          );
-          if (result == true) {
-            await context.read<VehicleRepository>().invalidate();
-          }
-        },
-        icon: const Icon(Icons.add),
-        label: const Text('Adicionar Veículo'),
-      ),
     );
   }
 }
