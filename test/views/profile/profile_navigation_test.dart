@@ -7,6 +7,7 @@ import 'package:vehicle_maintenance/services/api_service.dart';
 import 'package:vehicle_maintenance/services/auth_service.dart';
 import 'package:vehicle_maintenance/services/auth_token_storage.dart';
 import 'package:vehicle_maintenance/services/fcm_service.dart';
+import 'package:vehicle_maintenance/views/auth/login_hub_page.dart';
 import 'package:vehicle_maintenance/views/home_page.dart';
 import 'package:vehicle_maintenance/views/profile/profile_edit_page.dart';
 import 'package:vehicle_maintenance/views/profile/settings_page.dart';
@@ -47,6 +48,15 @@ class TestAuthService extends AuthService {
 
   @override
   Future<Map<String, dynamic>?> getCurrentUser() async => user;
+}
+
+class DeletingAuthService extends TestAuthService {
+  bool deleted = false;
+
+  @override
+  Future<void> deleteAccount() async {
+    deleted = true;
+  }
 }
 
 ApiService mockApiService() {
@@ -123,9 +133,63 @@ void main() {
 
       expect(find.byType(SettingsPage), findsOneWidget);
       expect(find.text('Segurança'), findsOneWidget);
+      expect(find.text('Conta'), findsOneWidget);
       expect(find.text('Notificações'), findsOneWidget);
-      expect(find.text('Sobre'), findsOneWidget);
       expect(find.text('Sair deste aparelho'), findsOneWidget);
+      expect(find.text('Excluir conta'), findsOneWidget);
+
+      await tester.drag(
+        find.descendant(
+          of: find.byType(SettingsPage),
+          matching: find.byType(ListView),
+        ),
+        const Offset(0, -800),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Sobre'), findsOneWidget);
+    });
+
+    testWidgets('delete account dialog can be cancelled', (tester) async {
+      await tester.pumpWidget(buildProfileTestApp(TestAuthService()));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Perfil'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Configurações'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Excluir conta'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.textContaining('O histórico de manutenções permanece no chassi'),
+        findsOneWidget,
+      );
+
+      await tester.tap(find.text('Cancelar'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(SettingsPage), findsOneWidget);
+      expect(find.byType(AlertDialog), findsNothing);
+    });
+
+    testWidgets('confirming delete account returns to login hub',
+        (tester) async {
+      final authService = DeletingAuthService();
+      await tester.pumpWidget(buildProfileTestApp(authService));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Perfil'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Configurações'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Excluir conta'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(TextButton, 'Excluir conta'));
+      await tester.pumpAndSettle();
+
+      expect(authService.deleted, isTrue);
+      expect(find.byType(LoginHubPage), findsOneWidget);
+      expect(find.text('Como você deseja entrar?'), findsOneWidget);
     });
   });
 }

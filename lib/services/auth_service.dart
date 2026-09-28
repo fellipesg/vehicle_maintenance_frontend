@@ -319,15 +319,42 @@ class AuthService {
     } catch (e) {
       // Continue with logout even if API call fails
     } finally {
-      _token = null;
-      _user = null;
-      final prefs = await SharedPreferences.getInstance();
-      await _tokenStorage.deleteToken();
-      await prefs.remove(_legacyTokenKey);
-      await prefs.remove(_userKey);
-      _apiService.setAuthToken(null);
-      await vehicleRepository?.clear();
+      await _clearLocalSession();
     }
+  }
+
+  Future<void> deleteAccount() async {
+    try {
+      await _fcmService?.removeToken();
+    } catch (_) {
+      // Account deletion must proceed even if push token cleanup fails.
+    }
+
+    try {
+      final response = await _apiService.deleteAccount();
+      if (response.data is Map && response.data['success'] == true) {
+        await _clearLocalSession();
+        return;
+      }
+
+      throw Exception('Não foi possível excluir a conta');
+    } on DioException catch (e) {
+      final message = e.response?.data is Map
+          ? e.response?.data['message']?.toString()
+          : null;
+      throw Exception(message ?? 'Não foi possível excluir a conta');
+    }
+  }
+
+  Future<void> _clearLocalSession() async {
+    _token = null;
+    _user = null;
+    final prefs = await SharedPreferences.getInstance();
+    await _tokenStorage.deleteToken();
+    await prefs.remove(_legacyTokenKey);
+    await prefs.remove(_userKey);
+    _apiService.setAuthToken(null);
+    await vehicleRepository?.clear();
   }
 
   Future<Map<String, dynamic>?> getCurrentUser() async {

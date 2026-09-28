@@ -317,24 +317,47 @@ class _MaintenanceDetailPageState extends State<MaintenanceDetailPage> {
                           ),
                           const Divider(height: 1),
                           ..._maintenance!.items!.map((MaintenanceItem item) {
-                            return ListTile(
-                              title: Text(item.name),
-                              subtitle: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
+                            return Padding(
+                              padding:
+                                  const EdgeInsets.fromLTRB(16, 12, 16, 12),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
                                 children: [
-                                  if (item.description != null)
+                                  Row(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          item.name,
+                                          style: Theme.of(context)
+                                              .textTheme
+                                              .titleMedium
+                                              ?.copyWith(
+                                                fontWeight: FontWeight.w600,
+                                                fontSize: 15,
+                                              ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        '${item.quantity}x R\$ ${item.totalPrice.toStringAsFixed(2)}',
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  if (item.description != null) ...[
+                                    const SizedBox(height: 4),
                                     Text(item.description!),
+                                  ],
                                   if (item.hasWarranty || item.warranty != null)
                                     Padding(
-                                      padding: const EdgeInsets.only(top: 6),
+                                      padding: const EdgeInsets.only(top: 8),
                                       child: _buildItemWarrantySection(item),
                                     ),
                                 ],
-                              ),
-                              trailing: Text(
-                                '${item.quantity}x R\$ ${item.totalPrice.toStringAsFixed(2)}',
-                                style: const TextStyle(
-                                    fontWeight: FontWeight.bold),
                               ),
                             );
                           }),
@@ -499,17 +522,37 @@ class _MaintenanceDetailPageState extends State<MaintenanceDetailPage> {
             ? 'Em garantia até ${DateFormat('dd/MM/yyyy').format(warranty.endsAt!)}'
             : warranty.name);
 
-    return Chip(
-      label: Text(label),
-      avatar: Icon(
-        warranty.isVigente ? Icons.verified : Icons.history,
-        size: 18,
+    if (!warranty.isVigente) {
+      return Chip(
+        label: Text(label),
+        avatar: const Icon(Icons.history, size: 18),
+        backgroundColor: Colors.orange.shade50,
+        side: BorderSide(color: Colors.orange.shade300),
+      );
+    }
+
+    return Container(
+      key: const Key('general_warranty_chip_vigente'),
+      constraints: const BoxConstraints(minHeight: 32),
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0F766E),
+        borderRadius: BorderRadius.circular(16),
       ),
-      backgroundColor:
-          warranty.isVigente ? Colors.green.shade50 : Colors.orange.shade50,
-      side: BorderSide(
-        color:
-            warranty.isVigente ? Colors.green.shade300 : Colors.orange.shade300,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.verified, size: 14, color: Colors.white),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w600,
+              fontSize: 13,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -531,37 +574,69 @@ class _MaintenanceDetailPageState extends State<MaintenanceDetailPage> {
         if (label != null)
           Padding(
             padding: const EdgeInsets.only(top: 4),
-            child: Wrap(
-              spacing: 8,
-              runSpacing: 4,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              children: [
-                Chip(
-                  label: Text(
-                    item.isUnderWarranty ? 'Em garantia' : 'Garantia encerrada',
-                    style: const TextStyle(fontSize: 12),
-                  ),
-                  backgroundColor: item.isUnderWarranty
-                      ? Colors.green.shade50
-                      : Colors.orange.shade50,
-                  side: BorderSide(
-                    color: item.isUnderWarranty
-                        ? Colors.green.shade300
-                        : Colors.orange.shade300,
-                  ),
-                  visualDensity: VisualDensity.compact,
-                  padding: EdgeInsets.zero,
-                ),
-                Text(
-                  label,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Colors.grey.shade700,
+            child: item.isUnderWarranty
+                ? Wrap(
+                    spacing: 8,
+                    runSpacing: 4,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      Chip(
+                        label: const Text(
+                          'Em garantia',
+                          style: TextStyle(fontSize: 12),
+                        ),
+                        backgroundColor: Colors.green.shade50,
+                        side: BorderSide(color: Colors.green.shade300),
+                        visualDensity: VisualDensity.compact,
+                        padding: EdgeInsets.zero,
                       ),
-                ),
-              ],
-            ),
+                      Text(
+                        label,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: Colors.grey.shade700,
+                            ),
+                      ),
+                    ],
+                  )
+                : _buildExpiredItemWarrantyChip(label),
           ),
       ],
+    );
+  }
+
+  Widget _buildExpiredItemWarrantyChip(String label) {
+    final chipText = expiredWarrantyChipLabel(label);
+
+    return Container(
+      key: const Key('item_warranty_chip_expired'),
+      width: double.infinity,
+      constraints: const BoxConstraints(minHeight: 28),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFEF3C7),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFD97706)),
+      ),
+      child: Row(
+        children: [
+          const Icon(
+            Icons.schedule,
+            size: 13,
+            color: Color(0xFFD97706),
+          ),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              chipText,
+              style: const TextStyle(
+                color: Color(0xFF92400E),
+                fontWeight: FontWeight.w600,
+                fontSize: 12,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 

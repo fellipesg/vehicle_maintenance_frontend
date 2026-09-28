@@ -12,6 +12,7 @@ class ProvenanceStrip extends StatelessWidget {
     this.verifiedFilter,
     this.onTapSegment,
     this.onFilterChanged,
+    this.showFilterChips = true,
   });
 
   static const int _maxVisibleDots = 16;
@@ -22,6 +23,7 @@ class ProvenanceStrip extends StatelessWidget {
   final bool? verifiedFilter;
   final ValueChanged<int>? onTapSegment;
   final ValueChanged<bool?>? onFilterChanged;
+  final bool showFilterChips;
 
   int get _declaredCount => totalMaintenances - verifiedCount;
 
@@ -35,83 +37,126 @@ class ProvenanceStrip extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text.rich(
-          TextSpan(
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: const Color(0xFF374151),
-            ),
-            children: [
-              TextSpan(
-                text: '$verifiedCount',
-                style: const TextStyle(
-                  fontWeight: FontWeight.w600,
-                  color: ProvenanceTheme.verifiedInk,
-                ),
-              ),
-              const TextSpan(text: ' com selo · '),
-              TextSpan(
-                text: '$_declaredCount',
-                style: const TextStyle(
-                  fontWeight: FontWeight.w600,
-                  color: ProvenanceTheme.declaredInk,
-                ),
-              ),
-              TextSpan(text: ' $declaredLabel'),
-            ],
-          ),
-        ),
-        if (visible.isNotEmpty) ...[
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: ProvenanceTheme.dotGap,
-            runSpacing: ProvenanceTheme.dotGap,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
-              for (var i = 0; i < visible.length; i++)
-                _ProvenanceDot(
-                  key: Key('provenance_strip_segment_$i'),
-                  segment: visible[i],
-                  onTap: onTapSegment == null
-                      ? null
-                      : () => onTapSegment!(visible[i].maintenanceId),
-                ),
-              if (overflow > 0)
-                Text(
-                  '+$overflow',
-                  key: const Key('provenance_strip_overflow'),
-                  style: theme.textTheme.labelSmall?.copyWith(
-                    fontWeight: FontWeight.w600,
-                    color: const Color(0xFF6B7280),
+        if (visible.isNotEmpty)
+          Semantics(
+            label: '$verifiedCount com selo, $_declaredCount $declaredLabel',
+            child: Wrap(
+              spacing: ProvenanceTheme.dotGap,
+              runSpacing: ProvenanceTheme.dotGap,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                for (var i = 0; i < visible.length; i++)
+                  _ProvenanceDot(
+                    key: Key('provenance_strip_segment_$i'),
+                    segment: visible[i],
+                    onTap: onTapSegment == null
+                        ? null
+                        : () => onTapSegment!(visible[i].maintenanceId),
                   ),
-                ),
-            ],
+                if (overflow > 0)
+                  Text(
+                    '+$overflow',
+                    key: const Key('provenance_strip_overflow'),
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: const Color(0xFF6B7280),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        if (showFilterChips && onFilterChanged != null) ...[
+          const SizedBox(height: 8),
+          ProvenanceFilterBar(
+            verifiedFilter: verifiedFilter,
+            onFilterChanged: onFilterChanged!,
           ),
         ],
-        const SizedBox(height: 8),
-        Wrap(
-          spacing: 8,
-          children: [
-            ChoiceChip(
-              key: const Key('provenance_filter_all'),
-              label: const Text('Todas'),
-              selected: verifiedFilter == null,
-              onSelected: (_) => onFilterChanged?.call(null),
-            ),
-            ChoiceChip(
-              key: const Key('provenance_filter_verified'),
-              label: const Text(ProvenanceTheme.sealLabel),
-              selected: verifiedFilter == true,
-              onSelected: (_) => onFilterChanged?.call(true),
-            ),
-            ChoiceChip(
-              key: const Key('provenance_filter_declared'),
-              label: const Text('Declaradas'),
-              selected: verifiedFilter == false,
-              onSelected: (_) => onFilterChanged?.call(false),
-            ),
-          ],
+      ],
+    );
+  }
+}
+
+/// Filtro Todas / Selo / Declaradas (memória, sem nova chamada à API).
+class ProvenanceFilterBar extends StatelessWidget {
+  const ProvenanceFilterBar({
+    super.key,
+    required this.verifiedFilter,
+    required this.onFilterChanged,
+  });
+
+  final bool? verifiedFilter;
+  final ValueChanged<bool?> onFilterChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        _ProvenanceFilterButton(
+          key: const Key('provenance_filter_all'),
+          label: 'Todas',
+          selected: verifiedFilter == null,
+          onTap: () => onFilterChanged(null),
+        ),
+        _ProvenanceFilterButton(
+          key: const Key('provenance_filter_verified'),
+          label: ProvenanceTheme.sealLabel,
+          selected: verifiedFilter == true,
+          onTap: () => onFilterChanged(true),
+        ),
+        _ProvenanceFilterButton(
+          key: const Key('provenance_filter_declared'),
+          label: 'Declaradas',
+          selected: verifiedFilter == false,
+          onTap: () => onFilterChanged(false),
         ),
       ],
+    );
+  }
+}
+
+class _ProvenanceFilterButton extends StatelessWidget {
+  const _ProvenanceFilterButton({
+    super.key,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  static const Color _inactiveBorder = Color(0xFFD1D5DB);
+  static const Color _inactiveText = Color(0xFF9CA3AF);
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: selected ? ProvenanceTheme.verifiedInk : Colors.transparent,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+        side: BorderSide(
+          color: selected ? ProvenanceTheme.verifiedInk : _inactiveBorder,
+        ),
+      ),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(20),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          child: Text(
+            label,
+            style: TextStyle(
+              color: selected ? Colors.white : _inactiveText,
+              fontWeight: FontWeight.w500,
+              fontSize: 13,
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

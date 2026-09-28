@@ -54,6 +54,7 @@ class ProvenanceCard extends StatelessWidget {
           workshopName:
               maintenance.verifiedWorkshop?.name ?? maintenance.workshopName,
           authorName: maintenance.ownerName,
+          registeredByType: maintenance.registeredByType,
         ),
         const SizedBox(width: 12),
         Expanded(

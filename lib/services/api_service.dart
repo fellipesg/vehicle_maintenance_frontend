@@ -271,6 +271,10 @@ class ApiService {
     return await _dio.put('/me', data: data);
   }
 
+  Future<Response> deleteAccount() async {
+    return await _dio.delete('/me');
+  }
+
   Future<Response> uploadAvatar(File file) async {
     final formData = FormData.fromMap({
       'avatar': await MultipartFile.fromFile(

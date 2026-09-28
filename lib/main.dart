@@ -1,9 +1,11 @@
-import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'firebase_options.dart';
 import 'firebase_messaging_background.dart';
+import 'utils/api_base_url.dart';
 import 'services/push_notification_setup.dart';
 import 'services/notification_navigation.dart';
 import 'views/home_page.dart';
@@ -40,9 +42,9 @@ class MyApp extends StatefulWidget {
 
 class _MyAppState extends State<MyApp> {
   final ApiService _apiService = ApiService(
-    baseUrl: const String.fromEnvironment(
-      'API_BASE_URL',
-      defaultValue: 'http://10.0.2.2:8081/api/v1',
+    baseUrl: ApiBaseUrl.resolve(
+      fromEnvironment: const String.fromEnvironment('API_BASE_URL'),
+      isRelease: kReleaseMode,
     ),
   );
   late final AuthService _authService;
@@ -127,6 +129,9 @@ final ThemeData _brandTheme = ThemeData(
   appBarTheme: const AppBarTheme(
     centerTitle: true,
     elevation: 0,
+    scrolledUnderElevation: 0,
+    surfaceTintColor: Colors.transparent,
+    shadowColor: Colors.transparent,
     backgroundColor: _brandNavy,
     foregroundColor: Colors.white,
   ),

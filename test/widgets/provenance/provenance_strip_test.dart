@@ -4,7 +4,8 @@ import 'package:vehicle_maintenance/models/provenance_segment.dart';
 import 'package:vehicle_maintenance/widgets/provenance/provenance_strip.dart';
 
 void main() {
-  testWidgets('renders compact summary and one dot per visible segment', (tester) async {
+  testWidgets('renders compact summary and one dot per visible segment',
+      (tester) async {
     final segments = [
       ProvenanceSegment(
           maintenanceId: 1, date: DateTime(2024, 1, 1), isVerified: true),
@@ -32,8 +33,8 @@ void main() {
 
     expect(find.byKey(const Key('provenance_strip_segment_0')), findsOneWidget);
     expect(find.byKey(const Key('provenance_strip_segment_4')), findsOneWidget);
-    expect(find.textContaining('3 com selo'), findsOneWidget);
-    expect(find.textContaining('2 declaradas'), findsOneWidget);
+    expect(find.textContaining('com selo'), findsNothing);
+    expect(find.textContaining('declaradas'), findsNothing);
   });
 
   testWidgets('tap on second segment calls callback with id', (tester) async {
@@ -86,7 +87,8 @@ void main() {
       ),
     );
 
-    expect(find.byKey(const Key('provenance_strip_segment_15')), findsOneWidget);
+    expect(
+        find.byKey(const Key('provenance_strip_segment_15')), findsOneWidget);
     expect(find.byKey(const Key('provenance_strip_segment_16')), findsNothing);
     expect(find.byKey(const Key('provenance_strip_overflow')), findsOneWidget);
     expect(find.text('+1'), findsOneWidget);

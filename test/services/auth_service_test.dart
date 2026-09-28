@@ -101,6 +101,79 @@ void main() {
       expect(prefs.getString('user_data'), isNull);
     });
 
+    test('deleteAccount on success clears token and user', () async {
+      await authService.saveToken('secret-token');
+      await authService.saveUser({'id': 1, 'name': 'Test User'});
+
+      apiService.dio.interceptors.add(
+        InterceptorsWrapper(
+          onRequest: (options, handler) {
+            if (options.path == '/me' && options.method == 'DELETE') {
+              handler.resolve(
+                Response(
+                  requestOptions: options,
+                  data: {
+                    'success': true,
+                    'message': 'Account deleted successfully',
+                  },
+                ),
+              );
+              return;
+            }
+
+            handler.next(options);
+          },
+        ),
+      );
+
+      await authService.deleteAccount();
+
+      expect(tokenStorage.token, isNull);
+      expect(authService.token, isNull);
+      expect(authService.user, isNull);
+      expect(authService.isAuthenticated, isFalse);
+
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getString('user_data'), isNull);
+    });
+
+    test('deleteAccount on failure keeps the local session', () async {
+      await authService.saveToken('secret-token');
+      await authService.saveUser({'id': 1, 'name': 'Test User'});
+
+      apiService.dio.interceptors.add(
+        InterceptorsWrapper(
+          onRequest: (options, handler) {
+            if (options.path == '/me' && options.method == 'DELETE') {
+              handler.reject(
+                DioException(
+                  requestOptions: options,
+                  response: Response(
+                    requestOptions: options,
+                    statusCode: 422,
+                    data: {
+                      'success': false,
+                      'message': 'Não foi possível excluir a conta',
+                    },
+                  ),
+                  type: DioExceptionType.badResponse,
+                ),
+              );
+              return;
+            }
+
+            handler.next(options);
+          },
+        ),
+      );
+
+      await expectLater(authService.deleteAccount(), throwsA(isA<Exception>()));
+
+      expect(tokenStorage.token, 'secret-token');
+      expect(authService.token, 'secret-token');
+      expect(authService.isAuthenticated, isTrue);
+    });
+
     test('login success persists token with full user payload', () async {
       apiService.dio.interceptors.add(
         InterceptorsWrapper(

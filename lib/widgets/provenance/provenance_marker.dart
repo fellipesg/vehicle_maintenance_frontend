@@ -9,6 +9,7 @@ class ProvenanceMarker extends StatelessWidget {
     this.workshopLogoUrl,
     this.workshopName,
     this.authorName,
+    this.registeredByType,
     this.size = ProvenanceMarkerSize.md,
   });
 
@@ -16,6 +17,7 @@ class ProvenanceMarker extends StatelessWidget {
   final String? workshopLogoUrl;
   final String? workshopName;
   final String? authorName;
+  final String? registeredByType;
   final ProvenanceMarkerSize size;
 
   double get _dimension {
@@ -30,7 +32,11 @@ class ProvenanceMarker extends StatelessWidget {
   }
 
   String get _initials {
-    final source = (isVerified ? workshopName : authorName) ?? '?';
+    if (!isVerified) {
+      return ProvenanceTheme.declaredInitials(registeredByType);
+    }
+
+    final source = workshopName ?? '?';
     final parts = source.trim().split(RegExp(r'\s+'));
     return parts
         .where((p) => p.isNotEmpty)
@@ -39,13 +45,13 @@ class ProvenanceMarker extends StatelessWidget {
         .join();
   }
 
-  Widget _initialsText(Color color) {
+  Widget _initialsText(Color color, {required bool declared}) {
     return Text(
       _initials,
       style: TextStyle(
         color: color,
-        fontSize: _dimension * 0.32,
-        fontWeight: FontWeight.w600,
+        fontSize: declared ? 11 : _dimension * 0.32,
+        fontWeight: declared ? FontWeight.w700 : FontWeight.w600,
       ),
     );
   }
@@ -90,12 +96,16 @@ class ProvenanceMarker extends StatelessWidget {
                 fit: BoxFit.cover,
                 errorBuilder: (_, __, ___) => ColoredBox(
                   color: ProvenanceTheme.verifiedInk,
-                  child: Center(child: _initialsText(Colors.white)),
+                  child: Center(
+                    child: _initialsText(Colors.white, declared: false),
+                  ),
                 ),
               )
             : ColoredBox(
                 color: ProvenanceTheme.verifiedInk,
-                child: Center(child: _initialsText(Colors.white)),
+                child: Center(
+                  child: _initialsText(Colors.white, declared: false),
+                ),
               ),
       ),
     );
@@ -118,7 +128,9 @@ class ProvenanceMarker extends StatelessWidget {
             shape: BoxShape.circle,
             color: ProvenanceTheme.declaredSurface,
           ),
-          child: Center(child: _initialsText(ProvenanceTheme.declaredInk)),
+          child: Center(
+            child: _initialsText(ProvenanceTheme.declaredInk, declared: true),
+          ),
         ),
       ),
     );

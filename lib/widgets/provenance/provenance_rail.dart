@@ -23,18 +23,12 @@ class ProvenanceRail extends StatelessWidget {
     final painter = _ProvenanceRailPainter(isVerified: isVerified);
 
     if (expand) {
-      return LayoutBuilder(
-        builder: (context, constraints) {
-          final railHeight = constraints.maxHeight;
-          if (!railHeight.isFinite || railHeight <= 0) {
-            return const SizedBox.shrink();
-          }
-
-          return CustomPaint(
-            size: Size(ProvenanceTheme.railWidth, railHeight),
-            painter: painter,
-          );
-        },
+      return SizedBox(
+        width: ProvenanceTheme.railWidth,
+        child: CustomPaint(
+          painter: painter,
+          child: const SizedBox.expand(),
+        ),
       );
     }
 

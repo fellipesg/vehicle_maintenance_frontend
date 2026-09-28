@@ -34,6 +34,16 @@ class _MaintenanceListPageState extends State<MaintenanceListPage> {
     _loadMaintenances();
   }
 
+  List<Maintenance> get _visibleMaintenances {
+    if (_verifiedFilter == null) {
+      return _maintenances;
+    }
+
+    return _maintenances
+        .where((maintenance) => maintenance.isVerified == _verifiedFilter)
+        .toList();
+  }
+
   Future<void> _loadMaintenances() async {
     try {
       final apiService = Provider.of<ApiService>(context, listen: false);
@@ -42,7 +52,6 @@ class _MaintenanceListPageState extends State<MaintenanceListPage> {
       if (widget.vehicleId != null) {
         response = await apiService.getVehicleMaintenances(
           widget.vehicleId.toString(),
-          verified: _verifiedFilter,
         );
       } else {
         response = await apiService.getMaintenances();
@@ -80,7 +89,7 @@ class _MaintenanceListPageState extends State<MaintenanceListPage> {
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : _maintenances.isEmpty
+          : _visibleMaintenances.isEmpty
               ? Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -114,7 +123,7 @@ class _MaintenanceListPageState extends State<MaintenanceListPage> {
                     children: [
                       const ProvenanceLegend(),
                       const SizedBox(height: 12),
-                      for (final maintenance in _maintenances)
+                      for (final maintenance in _visibleMaintenances)
                         Padding(
                           padding: const EdgeInsets.only(bottom: 12),
                           child: ProvenanceCard(

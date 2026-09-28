@@ -35,6 +35,27 @@ void main() {
       expect(item.displayWarrantyLabel, 'Em garantia até 01/08/2026');
     });
 
+    test('expired item formats Garantia encerrada with date', () {
+      final item = MaintenanceItem.fromJson({
+        'name': 'Bateria',
+        'quantity': 1,
+        'unit_price': '100.00',
+        'total_price': '100.00',
+        'has_warranty': true,
+        'is_under_warranty': false,
+        'warranty_ends_at': '2024-01-15',
+      });
+
+      expect(item.displayWarrantyLabel, 'Garantia encerrada · até 15/01/2024');
+    });
+
+    test('expiredWarrantyChipLabel prefixes Encerrada labels', () {
+      expect(
+        expiredWarrantyChipLabel('Encerrada · Garantia até 07/08/2026'),
+        'Garantia encerrada · até 07/08/2026',
+      );
+    });
+
     test('toJson sends warranty_template_id without legacy dates', () {
       final item = MaintenanceItem(
         name: 'Filtro',

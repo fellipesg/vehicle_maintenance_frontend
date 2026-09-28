@@ -16,6 +16,19 @@ Os arquivos `google-services.json` e `firebase_options.dart` contêm chaves de A
 4. Na aba **Your apps**, selecione o app Android
 5. Baixe o arquivo `google-services.json`
 
+### 1b. App iOS (obrigatório antes da App Store)
+
+O bundle da loja é `br.com.revisalog.app`. O Firebase ainda tem o iOS antigo `com.example.vehicleMaintenance`. Sem um app iOS novo, o FCM da loja não autentica no APNs.
+
+1. No mesmo projeto, **Add app** → iOS
+2. Bundle ID: `br.com.revisalog.app`
+3. App nickname: RevisaLog
+4. Baixe o `GoogleService-Info.plist` e substitua `ios/Runner/GoogleService-Info.plist`
+5. Em **Project settings → Cloud Messaging**, envie a chave APNs (.p8) criada no Apple Developer
+6. Rode `flutterfire configure --project=vehicle-maintenance-a9e32` para regenerar `lib/firebase_options.dart` com o `iosBundleId` correto
+
+Não invente `GOOGLE_APP_ID`. Use só o arquivo baixado do Console.
+
 ### 2. Configurar arquivos localmente
 
 **Copie os arquivos de exemplo e preencha com suas credenciais:**

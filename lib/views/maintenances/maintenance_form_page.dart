@@ -470,7 +470,7 @@ class _MaintenanceFormPageState extends State<MaintenanceFormPage> {
                     border: const OutlineInputBorder(),
                     helperText: _minKilometers == null
                         ? 'Informe o hodômetro nesta manutenção.'
-                        : 'Hodômetro atual: $_minKilometers km. Informe um valor igual ou maior.',
+                        : 'Hodômetro atual: $_minKilometers km. Pode ser menor para histórico anterior.',
                   ),
                   keyboardType: TextInputType.number,
                   validator: (value) {
@@ -480,9 +480,6 @@ class _MaintenanceFormPageState extends State<MaintenanceFormPage> {
                     final km = int.tryParse(value.trim());
                     if (km == null || km < 0) {
                       return 'Quilometragem inválida';
-                    }
-                    if (_minKilometers != null && km < _minKilometers!) {
-                      return 'A quilometragem deve ser no mínimo $_minKilometers km';
                     }
                     return null;
                   },

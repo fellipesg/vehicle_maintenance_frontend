@@ -30,4 +30,13 @@ abstract final class ProvenanceTheme {
   static const String declaredGarageLabel = 'Declarada pelo lojista';
   static const String verifiedMeta = 'verificada';
   static const String unverifiedMeta = 'não verificada';
+
+  /// Iniciais do marcador declarado (`owner` → PR, `garage` → LJ).
+  static String declaredInitials(String? registeredByType) {
+    if (registeredByType == 'garage') {
+      return 'LJ';
+    }
+
+    return 'PR';
+  }
 }

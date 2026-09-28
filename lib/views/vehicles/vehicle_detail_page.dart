@@ -1,7 +1,6 @@
 import 'dart:io';
 import 'dart:typed_data';
 
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
@@ -11,7 +10,6 @@ import '../../models/vehicle.dart';
 import '../../repositories/vehicle_repository.dart';
 import '../../services/api_service.dart';
 import '../../utils/pdf_download_file_name.dart';
-import '../../widgets/provenance/provenance_strip.dart';
 import '../../widgets/vehicle_cover_avatar.dart';
 import '../../widgets/vehicle_identity.dart';
 import '../../widgets/vehicle_maintenance_timeline.dart';
@@ -309,39 +307,6 @@ class _VehicleDetailPageState extends State<VehicleDetailPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              LayoutBuilder(
-                builder: (context, constraints) {
-                  final isWide = constraints.maxWidth >= 600;
-                  final heroUrl = isWide
-                      ? (_vehicle!.coverPhotoUrl ??
-                          _vehicle!.coverPhotoPortraitUrl)
-                      : (_vehicle!.coverPhotoPortraitUrl ??
-                          _vehicle!.coverPhotoUrl);
-
-                  if (heroUrl == null || heroUrl.isEmpty) {
-                    return const SizedBox.shrink();
-                  }
-
-                  final cacheWidth = (constraints.maxWidth *
-                          MediaQuery.devicePixelRatioOf(context))
-                      .round();
-
-                  return ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: AspectRatio(
-                      aspectRatio: isWide ? 16 / 9 : 9 / 16,
-                      child: CachedNetworkImage(
-                        imageUrl: heroUrl,
-                        fit: BoxFit.cover,
-                        memCacheWidth: cacheWidth,
-                        fadeInDuration: const Duration(milliseconds: 150),
-                        errorWidget: (_, __, ___) => const SizedBox.shrink(),
-                      ),
-                    ),
-                  );
-                },
-              ),
-              const SizedBox(height: 16),
               Card(
                 child: Padding(
                   padding: const EdgeInsets.all(16),
@@ -427,24 +392,19 @@ class _VehicleDetailPageState extends State<VehicleDetailPage> {
                   ),
                 ),
               ),
-              if (_vehicle!.provenanceStrip != null &&
-                  _vehicle!.provenanceStrip!.isNotEmpty) ...[
-                const SizedBox(height: 16),
-                ProvenanceStrip(
-                  segments: _vehicle!.provenanceStrip!,
-                  totalMaintenances: _vehicle!.maintenancesCount ??
-                      _vehicle!.provenanceStrip!.length,
-                  verifiedCount: _vehicle!.verifiedMaintenancesCount ?? 0,
-                  verifiedFilter: _verifiedFilter,
-                  onFilterChanged: (filter) {
-                    setState(() => _verifiedFilter = filter);
-                  },
-                  onTapSegment: (_) {},
-                ),
-              ],
               if (_timeline != null) ...[
                 const SizedBox(height: 16),
-                VehicleMaintenanceTimeline(timeline: _timeline!),
+                VehicleMaintenanceTimeline(
+                  timeline: _timeline!,
+                  verifiedFilter: _verifiedFilter,
+                  onVerifiedFilterChanged: (filter) {
+                    setState(() => _verifiedFilter = filter);
+                  },
+                  provenanceStrip: _vehicle!.provenanceStrip,
+                  maintenancesCount: _vehicle!.maintenancesCount,
+                  verifiedMaintenancesCount:
+                      _vehicle!.verifiedMaintenancesCount,
+                ),
               ],
               const SizedBox(height: 16),
               Card(

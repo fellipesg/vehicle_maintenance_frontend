@@ -2,17 +2,44 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import '../models/maintenance.dart';
+import '../models/provenance_segment.dart';
 import '../theme/provenance.dart';
-import 'provenance/provenance_card.dart';
+import '../views/maintenances/maintenance_detail_page.dart';
 import 'provenance/provenance_marker.dart';
 import 'provenance/provenance_rail.dart';
+import 'provenance/provenance_strip.dart';
+
+bool timelineEventMatchesVerifiedFilter(
+  Map<String, dynamic> event,
+  bool? verifiedFilter,
+) {
+  if (verifiedFilter == null) {
+    return true;
+  }
+
+  if (event['type'] != 'maintenance') {
+    return true;
+  }
+
+  return (event['is_verified'] == true) == verifiedFilter;
+}
 
 class VehicleMaintenanceTimeline extends StatefulWidget {
   final Map<String, dynamic> timeline;
+  final bool? verifiedFilter;
+  final ValueChanged<bool?>? onVerifiedFilterChanged;
+  final List<ProvenanceSegment>? provenanceStrip;
+  final int? maintenancesCount;
+  final int? verifiedMaintenancesCount;
 
   const VehicleMaintenanceTimeline({
     super.key,
     required this.timeline,
+    this.verifiedFilter,
+    this.onVerifiedFilterChanged,
+    this.provenanceStrip,
+    this.maintenancesCount,
+    this.verifiedMaintenancesCount,
   });
 
   @override
@@ -28,15 +55,60 @@ class _VehicleMaintenanceTimelineState
   @override
   void initState() {
     super.initState();
-    _events = (widget.timeline['events'] as List<dynamic>? ?? [])
+    _events = _parseEvents(widget.timeline);
+    _syncExpandedIndex();
+  }
+
+  @override
+  void didUpdateWidget(covariant VehicleMaintenanceTimeline oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.timeline != widget.timeline) {
+      _events = _parseEvents(widget.timeline);
+    }
+    if (oldWidget.timeline != widget.timeline ||
+        oldWidget.verifiedFilter != widget.verifiedFilter) {
+      _syncExpandedIndex();
+    }
+  }
+
+  List<Map<String, dynamic>> _parseEvents(Map<String, dynamic> timeline) {
+    return (timeline['events'] as List<dynamic>? ?? [])
         .map((event) => Map<String, dynamic>.from(event as Map))
         .toList();
+  }
+
+  List<Map<String, dynamic>> _visibleEvents() {
+    return _events
+        .where(
+          (event) =>
+              timelineEventMatchesVerifiedFilter(event, widget.verifiedFilter),
+        )
+        .toList();
+  }
+
+  void _syncExpandedIndex() {
+    final visible = _visibleEvents();
+    final currentId = _expandedIndex != null && _expandedIndex! < _events.length
+        ? _events[_expandedIndex!]['id']
+        : null;
+
+    if (currentId != null) {
+      final idx = visible.indexWhere((event) => event['id'] == currentId);
+      if (idx != -1) {
+        _expandedIndex = _events.indexOf(visible[idx]);
+        return;
+      }
+    }
 
     _expandedIndex = _events.indexWhere(
-      (event) => event['is_current'] == true,
+      (event) =>
+          event['is_current'] == true &&
+          timelineEventMatchesVerifiedFilter(event, widget.verifiedFilter),
     );
-    if (_expandedIndex == -1 && _events.isNotEmpty) {
-      _expandedIndex = _events.length - 1;
+    if (_expandedIndex == -1) {
+      final lastVisible = visible.isNotEmpty ? visible.last : null;
+      _expandedIndex =
+          lastVisible == null ? null : _events.indexOf(lastVisible);
     }
   }
 
@@ -66,6 +138,16 @@ class _VehicleMaintenanceTimelineState
     return NumberFormat.simpleCurrency(locale: 'pt_BR').format(amount);
   }
 
+  void _openMaintenanceDetail(int maintenanceId) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => MaintenanceDetailPage(
+          maintenanceId: maintenanceId,
+        ),
+      ),
+    );
+  }
+
   IconData _iconForEvent(Map<String, dynamic> event) {
     return switch (event['type']) {
       'registration' => Icons.directions_car,
@@ -76,7 +158,8 @@ class _VehicleMaintenanceTimelineState
 
   @override
   Widget build(BuildContext context) {
-    if (_events.isEmpty) {
+    final visibleEvents = _visibleEvents();
+    if (visibleEvents.isEmpty) {
       return const SizedBox.shrink();
     }
 
@@ -113,6 +196,30 @@ class _VehicleMaintenanceTimelineState
               '${approxAnnualKm != null ? ' · ~${_formatKm(approxAnnualKm)}/ano (aprox.)' : ''}',
               style: Theme.of(context).textTheme.bodySmall,
             ),
+            if (widget.onVerifiedFilterChanged != null) ...[
+              const SizedBox(height: 12),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (widget.provenanceStrip != null &&
+                      widget.provenanceStrip!.isNotEmpty) ...[
+                    ProvenanceStrip(
+                      segments: widget.provenanceStrip!,
+                      totalMaintenances: widget.maintenancesCount ??
+                          widget.provenanceStrip!.length,
+                      verifiedCount: widget.verifiedMaintenancesCount ?? 0,
+                      showFilterChips: false,
+                      onTapSegment: _openMaintenanceDetail,
+                    ),
+                    const SizedBox(height: 8),
+                  ],
+                  ProvenanceFilterBar(
+                    verifiedFilter: widget.verifiedFilter,
+                    onFilterChanged: widget.onVerifiedFilterChanged!,
+                  ),
+                ],
+              ),
+            ],
             if (nextDue != null) ...[
               const SizedBox(height: 16),
               _ProgressHeader(
@@ -125,10 +232,11 @@ class _VehicleMaintenanceTimelineState
               ),
             ],
             const SizedBox(height: 20),
-            ...List.generate(_events.length, (index) {
-              final event = _events[index];
-              final isLast = index == _events.length - 1;
-              final isExpanded = _expandedIndex == index;
+            ...List.generate(visibleEvents.length, (index) {
+              final event = visibleEvents[index];
+              final isLast = index == visibleEvents.length - 1;
+              final sourceIndex = _events.indexOf(event);
+              final isExpanded = _expandedIndex == sourceIndex;
               final isUpcoming = event['type'] == 'upcoming';
               final isCurrent = event['is_current'] == true;
 
@@ -142,9 +250,28 @@ class _VehicleMaintenanceTimelineState
                 formatKm: _formatKm,
                 formatDate: _formatDate,
                 formatMoney: _formatMoney,
-                onTap: () => setState(() {
-                  _expandedIndex = isExpanded ? null : index;
-                }),
+                onTap: () {
+                  if (event['type'] == 'maintenance') {
+                    final rawId = event['id'];
+                    final maintenanceId = rawId is int
+                        ? rawId
+                        : int.tryParse(rawId?.toString() ?? '');
+                    if (maintenanceId != null) {
+                      Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => MaintenanceDetailPage(
+                            maintenanceId: maintenanceId,
+                          ),
+                        ),
+                      );
+                    }
+                    return;
+                  }
+
+                  setState(() {
+                    _expandedIndex = isExpanded ? null : sourceIndex;
+                  });
+                },
               );
             }),
           ],
@@ -293,7 +420,7 @@ class _TimelineRow extends StatelessWidget {
 
     return IntrinsicHeight(
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           SizedBox(
             width: 72,
@@ -322,6 +449,7 @@ class _TimelineRow extends StatelessWidget {
                       isVerified: maintenance.isVerified,
                       workshopLogoUrl: maintenance.verifiedWorkshop?.logoUrl,
                       workshopName: maintenance.workshopName,
+                      registeredByType: maintenance.registeredByType,
                       size: ProvenanceMarkerSize.lg,
                     )
                   else
@@ -433,25 +561,25 @@ class _TimelineRow extends StatelessWidget {
                                 ),
                               ),
                               Icon(
-                                isExpanded
-                                    ? Icons.expand_less
-                                    : Icons.expand_more,
+                                isMaintenance
+                                    ? Icons.chevron_right
+                                    : (isExpanded
+                                        ? Icons.expand_less
+                                        : Icons.expand_more),
                                 color: colorScheme.outline,
                               ),
                             ],
                           ),
                         ),
-                        if (isExpanded)
+                        if (isExpanded && !isMaintenance)
                           Padding(
                             padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-                            child: maintenance != null
-                                ? ProvenanceCard(maintenance: maintenance)
-                                : _EventDetails(
-                                    event: event,
-                                    formatKm: formatKm,
-                                    formatDate: formatDate,
-                                    formatMoney: formatMoney,
-                                  ),
+                            child: _EventDetails(
+                              event: event,
+                              formatKm: formatKm,
+                              formatDate: formatDate,
+                              formatMoney: formatMoney,
+                            ),
                           ),
                       ],
                     ),

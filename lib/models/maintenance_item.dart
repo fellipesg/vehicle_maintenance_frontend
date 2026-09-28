@@ -85,11 +85,15 @@ class MaintenanceItem {
 
   String? get displayWarrantyLabel {
     if (warranty?.label != null && warranty!.label!.isNotEmpty) {
-      return warranty!.label;
+      return isUnderWarranty
+          ? warranty!.label
+          : expiredWarrantyChipLabel(warranty!.label!);
     }
 
     if (warrantyPeriodLabel != null && warrantyPeriodLabel!.isNotEmpty) {
-      return warrantyPeriodLabel;
+      return isUnderWarranty
+          ? warrantyPeriodLabel
+          : expiredWarrantyChipLabel(warrantyPeriodLabel!);
     }
 
     if (warrantyEndsAt != null) {
@@ -98,7 +102,7 @@ class MaintenanceItem {
           '${end.day.toString().padLeft(2, '0')}/${end.month.toString().padLeft(2, '0')}/${end.year}';
       return isUnderWarranty
           ? 'Em garantia até $formatted'
-          : 'Garantia até $formatted';
+          : 'Garantia encerrada · até $formatted';
     }
 
     return null;
@@ -120,4 +124,18 @@ class MaintenanceItem {
         'warranty_template_id': warrantyTemplateId,
     };
   }
+}
+
+/// Chip de item com garantia vencida: "Garantia encerrada · até dd/mm/aaaa".
+String expiredWarrantyChipLabel(String label) {
+  if (label.toLowerCase().startsWith('garantia encerrada')) {
+    return label;
+  }
+
+  final dateMatch = RegExp(r'(\d{2}/\d{2}/\d{4})').firstMatch(label);
+  if (dateMatch != null) {
+    return 'Garantia encerrada · até ${dateMatch.group(1)}';
+  }
+
+  return 'Garantia encerrada · $label';
 }

@@ -4,8 +4,15 @@ import 'package:provider/provider.dart';
 import '../../services/auth_service.dart';
 import '../auth/login_hub_page.dart';
 
-class SettingsPage extends StatelessWidget {
+class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
+
+  @override
+  State<SettingsPage> createState() => _SettingsPageState();
+}
+
+class _SettingsPageState extends State<SettingsPage> {
+  bool _isDeletingAccount = false;
 
   Future<void> _handleLogout(BuildContext context) async {
     final confirmed = await showDialog<bool>(
@@ -41,6 +48,68 @@ class SettingsPage extends StatelessWidget {
         MaterialPageRoute(builder: (_) => const LoginHubPage()),
         (route) => false,
       );
+    }
+  }
+
+  Future<void> _handleDeleteAccount(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Excluir conta'),
+        content: const Text(
+          'Isso remove seus dados pessoais e encerra o acesso. '
+          'O histórico de manutenções permanece no chassi do veículo. '
+          'Esta ação não pode ser desfeita.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Excluir conta'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !context.mounted) {
+      return;
+    }
+
+    setState(() {
+      _isDeletingAccount = true;
+    });
+
+    try {
+      final authService = Provider.of<AuthService>(context, listen: false);
+      await authService.deleteAccount();
+
+      if (!context.mounted) {
+        return;
+      }
+
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const LoginHubPage()),
+        (route) => false,
+      );
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.toString().replaceFirst('Exception: ', '')),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isDeletingAccount = false;
+        });
+      }
     }
   }
 
@@ -97,9 +166,33 @@ class SettingsPage extends StatelessWidget {
                     'Sair deste aparelho',
                     style: TextStyle(color: Colors.red),
                   ),
-                  onTap: () => _handleLogout(context),
+                  onTap:
+                      _isDeletingAccount ? null : () => _handleLogout(context),
                 ),
               ],
+            ),
+          ),
+          const SizedBox(height: 24),
+          const _SectionHeader(title: 'Conta'),
+          Card(
+            child: ListTile(
+              leading: _isDeletingAccount
+                  ? const SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.delete_forever, color: Colors.red),
+              title: const Text(
+                'Excluir conta',
+                style: TextStyle(color: Colors.red),
+              ),
+              subtitle: const Text(
+                'Remove seus dados pessoais deste aplicativo',
+              ),
+              onTap: _isDeletingAccount
+                  ? null
+                  : () => _handleDeleteAccount(context),
             ),
           ),
           const SizedBox(height: 24),
@@ -132,7 +225,7 @@ class SettingsPage extends StatelessWidget {
           const Card(
             child: ListTile(
               leading: Icon(Icons.info_outline),
-              title: Text('Vehicle Maintenance'),
+              title: Text('RevisaLog'),
               subtitle: Text('Versão 1.0.0'),
             ),
           ),
