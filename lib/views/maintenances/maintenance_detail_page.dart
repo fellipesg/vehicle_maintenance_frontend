@@ -14,6 +14,7 @@ import '../../models/invoice.dart';
 import '../../models/vehicle.dart';
 import '../../services/api_service.dart';
 import '../../services/auth_service.dart';
+import '../../theme/app_theme.dart';
 import '../../widgets/provenance/provenance_seal.dart';
 import '../../widgets/vehicle_cover_avatar.dart';
 import 'maintenance_form_page.dart';
@@ -524,8 +525,12 @@ class _MaintenanceDetailPageState extends State<MaintenanceDetailPage> {
 
     if (!warranty.isVigente) {
       return Chip(
-        label: Text(label),
-        avatar: const Icon(Icons.history, size: 18),
+        label: Text(
+          label,
+          style: const TextStyle(color: AppColors.warningInk),
+        ),
+        avatar:
+            const Icon(Icons.history, size: 18, color: AppColors.warningInk),
         backgroundColor: Colors.orange.shade50,
         side: BorderSide(color: Colors.orange.shade300),
       );
@@ -583,7 +588,10 @@ class _MaintenanceDetailPageState extends State<MaintenanceDetailPage> {
                       Chip(
                         label: const Text(
                           'Em garantia',
-                          style: TextStyle(fontSize: 12),
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: AppColors.positiveInk,
+                          ),
                         ),
                         backgroundColor: Colors.green.shade50,
                         side: BorderSide(color: Colors.green.shade300),
@@ -593,7 +601,9 @@ class _MaintenanceDetailPageState extends State<MaintenanceDetailPage> {
                       Text(
                         label,
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: Colors.grey.shade700,
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onSurfaceVariant,
                             ),
                       ),
                     ],
@@ -858,7 +868,7 @@ class _MaintenanceDetailPageState extends State<MaintenanceDetailPage> {
               label,
               style: TextStyle(
                 fontWeight: FontWeight.bold,
-                color: Colors.grey.shade600,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
             ),
           ),

@@ -1,18 +1,32 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:sign_in_with_apple/sign_in_with_apple.dart' as apple_ui;
 import 'package:url_launcher/url_launcher.dart';
 import '../home_page.dart';
 import '../../models/login_portal.dart';
 import '../../models/login_result.dart';
+import '../../services/apple_sign_in.dart';
 import '../../services/auth_service.dart';
 import 'oauth_webview_page.dart';
 import 'register_page.dart';
 import 'two_factor_challenge_page.dart';
 
 class LoginPage extends StatefulWidget {
-  const LoginPage({super.key, this.portal = LoginPortal.usuario});
+  const LoginPage({
+    super.key,
+    this.portal = LoginPortal.usuario,
+    this.appleSignInEnabled,
+    this.loadAppleCredential = loadAppleSignInCredential,
+  });
 
   final LoginPortal portal;
+
+  /// When null, Sign in with Apple is offered only on iOS.
+  final bool? appleSignInEnabled;
+
+  final AppleCredentialLoader loadAppleCredential;
 
   @override
   State<LoginPage> createState() => _LoginPageState();
@@ -97,8 +111,16 @@ class _LoginPageState extends State<LoginPage> {
 
   String _friendlyError(Object e) {
     final raw = e.toString().replaceFirst('Exception: ', '');
-    if (raw.contains('Este portal') || raw.contains('acesso a este portal')) {
+    if (raw.contains('Este portal') ||
+        raw.contains('acesso a este portal') ||
+        raw.contains('does not have access to this portal')) {
       return 'Esta conta não tem acesso a este portal.';
+    }
+    if (raw.contains('Unable to authenticate with Apple')) {
+      return 'Não foi possível entrar com a Apple. Tente novamente.';
+    }
+    if (raw.contains('did not share an email')) {
+      return 'A Apple não enviou um e-mail. Entre novamente e permita compartilhar o e-mail. O e-mail oculto da Apple também funciona.';
     }
     if (raw.contains('401') || raw.contains('Invalid login')) {
       return 'Credenciais inválidas.';
@@ -109,6 +131,72 @@ class _LoginPageState extends State<LoginPage> {
       return 'Login ok na API, mas falhou ao salvar a sessão neste dispositivo. Tente novamente.';
     }
     return raw;
+  }
+
+  bool get _showAppleSignIn => widget.appleSignInEnabled ?? Platform.isIOS;
+
+  Future<void> _handleAppleLogin() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final credential = await widget.loadAppleCredential();
+      if (credential == null || !mounted) {
+        return;
+      }
+
+      final authService = Provider.of<AuthService>(context, listen: false);
+      final result = await authService.loginWithApple(
+        identityToken: credential.identityToken,
+        rawNonce: credential.rawNonce,
+        name: credential.displayName,
+        portal: _portal.apiValue,
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      switch (result) {
+        case LoginSuccess():
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(builder: (_) => const HomePage()),
+            (route) => false,
+          );
+        case LoginNeedsTwoFactor(:final challengeToken):
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => TwoFactorChallengePage(
+                challengeToken: challengeToken,
+              ),
+            ),
+          );
+        case LoginFailure():
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content:
+                  Text('Não foi possível entrar com a Apple. Tente novamente.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(_friendlyError(e)),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
   }
 
   Future<void> _handleSSOLogin(String provider) async {
@@ -219,7 +307,7 @@ class _LoginPageState extends State<LoginPage> {
                 Text(
                   _portal.subtitle,
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: Colors.grey.shade600,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
                   textAlign: TextAlign.center,
                 ),
@@ -294,18 +382,42 @@ class _LoginPageState extends State<LoginPage> {
                   const SizedBox(height: 24),
                   Row(
                     children: [
-                      Expanded(child: Divider(color: Colors.grey.shade300)),
+                      Expanded(
+                        child: Divider(
+                          color: Theme.of(context).colorScheme.outlineVariant,
+                        ),
+                      ),
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 16),
                         child: Text(
                           'OU',
-                          style: TextStyle(color: Colors.grey.shade600),
+                          style: TextStyle(
+                            color:
+                                Theme.of(context).colorScheme.onSurfaceVariant,
+                          ),
                         ),
                       ),
-                      Expanded(child: Divider(color: Colors.grey.shade300)),
+                      Expanded(
+                        child: Divider(
+                          color: Theme.of(context).colorScheme.outlineVariant,
+                        ),
+                      ),
                     ],
                   ),
                   const SizedBox(height: 24),
+                  if (_showAppleSignIn) ...[
+                    apple_ui.SignInWithAppleButton(
+                      key: const Key('login_apple_button'),
+                      onPressed: _isLoading ? null : () => _handleAppleLogin(),
+                      text: 'Continuar com a Apple',
+                      height: 52,
+                      style: Theme.of(context).brightness == Brightness.dark
+                          ? apple_ui.SignInWithAppleButtonStyle.white
+                          : apple_ui.SignInWithAppleButtonStyle.black,
+                      iconAlignment: apple_ui.IconAlignment.left,
+                    ),
+                    const SizedBox(height: 12),
+                  ],
                   OutlinedButton.icon(
                     onPressed:
                         _isLoading ? null : () => _handleSSOLogin('google'),

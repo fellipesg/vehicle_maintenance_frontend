@@ -126,7 +126,7 @@ class _TwoFactorChallengePageState extends State<TwoFactorChallengePage> {
                       ? 'Digite um dos seus códigos de recuperação.'
                       : 'Digite o código de 6 dígitos do seu aplicativo autenticador.',
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: Colors.grey.shade600,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
                   textAlign: TextAlign.center,
                 ),

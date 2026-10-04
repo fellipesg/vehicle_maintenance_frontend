@@ -6,13 +6,16 @@ import 'notification_navigation.dart';
 class PushNotificationSetup {
   static bool _configured = false;
 
+  /// Chamado a cada push recebido com o app aberto (atualiza o badge do sino).
+  static void Function()? onPushReceived;
+
   static Future<void> configure() async {
     if (_configured) {
       return;
     }
 
     await LocalNotificationService.instance.initialize(
-      onTap: NotificationNavigation.openVehicleFromPayloadString,
+      onTap: NotificationNavigation.openFromPayloadString,
     );
 
     FirebaseMessaging.onMessage.listen((RemoteMessage message) async {
@@ -26,18 +29,20 @@ class PushNotificationSetup {
       }
 
       print('🔔 FCM recebido: $title');
+      onPushReceived?.call();
 
       await LocalNotificationService.instance.show(
         id: message.hashCode,
         title: title,
         body: body,
-        payload: message.data['vehicle_id']?.toString(),
+        payload: NotificationNavigation.encodePayload(message.data),
       );
     });
 
-    FirebaseMessaging.onMessageOpenedApp.listen(
-      NotificationNavigation.openVehicleFromMessage,
-    );
+    FirebaseMessaging.onMessageOpenedApp.listen((message) {
+      onPushReceived?.call();
+      NotificationNavigation.openFromMessage(message);
+    });
 
     _configured = true;
   }
@@ -46,7 +51,7 @@ class PushNotificationSetup {
     final launchDetails =
         await LocalNotificationService.instance.launchDetails();
     if (launchDetails?.didNotificationLaunchApp ?? false) {
-      NotificationNavigation.openVehicleFromPayloadString(
+      NotificationNavigation.openFromPayloadString(
         launchDetails!.notificationResponse?.payload,
       );
       return;
@@ -54,7 +59,7 @@ class PushNotificationSetup {
 
     final message = await FirebaseMessaging.instance.getInitialMessage();
     if (message != null) {
-      NotificationNavigation.openVehicleFromMessage(message);
+      NotificationNavigation.openFromMessage(message);
     }
   }
 }

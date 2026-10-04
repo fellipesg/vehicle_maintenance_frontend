@@ -16,6 +16,16 @@ Os arquivos `google-services.json` e `firebase_options.dart` contêm chaves de A
 4. Na aba **Your apps**, selecione o app Android
 5. Baixe o arquivo `google-services.json`
 
+### 1a. App Android (obrigatório antes da Play Store)
+
+O pacote da Play Store é `br.com.revisalog.app`. O Firebase precisa de um app Android com esse pacote. O `google-services.json` antigo (`com.example.vehicle_maintenance`) faz o build da loja falhar ou o push não autentica.
+
+1. No mesmo projeto, **Add app** → Android
+2. Android package name: `br.com.revisalog.app`
+3. App nickname: RevisaLog
+4. Baixe o `google-services.json` e substitua `android/app/google-services.json`
+5. Rode `flutterfire configure --project=vehicle-maintenance-a9e32` para regenerar `lib/firebase_options.dart`
+
 ### 1b. App iOS (obrigatório antes da App Store)
 
 O bundle da loja é `br.com.revisalog.app`. O Firebase ainda tem o iOS antigo `com.example.vehicleMaintenance`. Sem um app iOS novo, o FCM da loja não autentica no APNs.

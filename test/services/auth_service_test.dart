@@ -219,6 +219,55 @@ void main() {
       expect(authService.user?['email'], 'fgoncalves2008@gmail.com');
     });
 
+    test('loginWithApple posts the identity token and stores the session',
+        () async {
+      Map<String, dynamic>? body;
+      apiService.dio.interceptors.add(
+        InterceptorsWrapper(
+          onRequest: (options, handler) {
+            if (options.path == '/auth/apple' && options.method == 'POST') {
+              body = Map<String, dynamic>.from(options.data as Map);
+              handler.resolve(
+                Response(
+                  requestOptions: options,
+                  data: {
+                    'success': true,
+                    'data': {
+                      'token': 'apple-session',
+                      'token_type': 'Bearer',
+                      'user': {
+                        'id': 9,
+                        'email': 'relay@privaterelay.appleid.com',
+                        'user_type': 'user',
+                      },
+                    },
+                  },
+                ),
+              );
+              return;
+            }
+
+            handler.next(options);
+          },
+        ),
+      );
+
+      final result = await authService.loginWithApple(
+        identityToken: 'identity',
+        rawNonce: 'nonce-raw',
+        name: 'Ana Silva',
+        portal: 'usuario',
+      );
+
+      expect(result, isA<LoginSuccess>());
+      expect(body?['identity_token'], 'identity');
+      expect(body?['nonce'], 'nonce-raw');
+      expect(body?['name'], 'Ana Silva');
+      expect(body?['portal'], 'usuario');
+      expect(tokenStorage.token, 'apple-session');
+      expect(authService.user?['email'], 'relay@privaterelay.appleid.com');
+    });
+
     test('loadStoredAuth keeps user profile in SharedPreferences', () async {
       SharedPreferences.setMockInitialValues({
         'user_data': '{"id":1,"name":"Test User"}',

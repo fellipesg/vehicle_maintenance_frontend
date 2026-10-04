@@ -1,4 +1,4 @@
-package com.example.vehicle_maintenance
+package br.com.revisalog.app
 
 import io.flutter.embedding.android.FlutterActivity
 

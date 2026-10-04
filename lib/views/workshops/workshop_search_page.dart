@@ -169,7 +169,7 @@ class _WorkshopSearchPageState extends State<WorkshopSearchPage> {
                     Icon(
                       Icons.build_circle_outlined,
                       size: 64,
-                      color: Colors.grey[400],
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
                     const SizedBox(height: 16),
                     Text(
@@ -178,7 +178,7 @@ class _WorkshopSearchPageState extends State<WorkshopSearchPage> {
                           : 'Nenhuma oficina cadastrada',
                       style: TextStyle(
                         fontSize: 16,
-                        color: Colors.grey[600],
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
                     ),
                     if (widget.allowCreate) ...[

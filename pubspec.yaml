@@ -1,7 +1,7 @@
 name: vehicle_maintenance
 description: Aplicativo mobile para registro de manutenções de veículos
 publish_to: 'none'
-version: 1.0.0+3
+version: 1.0.0+4
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -49,6 +49,8 @@ dependencies:
   flutter_local_notifications: ^17.2.4
   image_cropper: ^12.2.1
   cached_network_image: ^3.4.1
+  sign_in_with_apple: ^7.0.1
+  crypto: ^3.0.7
 
 dev_dependencies:
   flutter_test:

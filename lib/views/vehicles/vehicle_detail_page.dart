@@ -485,7 +485,7 @@ class _VehicleDetailPageState extends State<VehicleDetailPage> {
               label,
               style: TextStyle(
                 fontWeight: FontWeight.bold,
-                color: Colors.grey.shade600,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
             ),
           ),
@@ -502,7 +502,7 @@ class _VehicleDetailPageState extends State<VehicleDetailPage> {
                     subtitle,
                     style: TextStyle(
                       fontSize: 12,
-                      color: Colors.grey.shade600,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
                   ),
               ],

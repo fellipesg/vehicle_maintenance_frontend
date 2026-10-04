@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 
 import '../models/maintenance.dart';
 import '../models/provenance_segment.dart';
+import '../theme/app_theme.dart';
 import '../theme/provenance.dart';
 import '../views/maintenances/maintenance_detail_page.dart';
 import 'provenance/provenance_marker.dart';
@@ -748,8 +749,12 @@ class _EventDetails extends StatelessWidget {
                                       fontSize: 11,
                                       fontWeight: FontWeight.w600,
                                       color: map['is_under_warranty'] == true
-                                          ? Colors.green.shade800
-                                          : Colors.orange.shade800,
+                                          ? AppColors.positive(
+                                              Theme.of(context).brightness,
+                                            )
+                                          : AppColors.warning(
+                                              Theme.of(context).brightness,
+                                            ),
                                     ),
                                   ),
                                 ),
@@ -813,7 +818,9 @@ class _GeneralWarrantyChip extends StatelessWidget {
           Icon(
             isVigente ? Icons.verified : Icons.history,
             size: 16,
-            color: isVigente ? Colors.green.shade800 : Colors.orange.shade800,
+            color: isVigente
+                ? AppColors.positive(Theme.of(context).brightness)
+                : AppColors.warning(Theme.of(context).brightness),
           ),
           const SizedBox(width: 6),
           Flexible(
@@ -822,8 +829,9 @@ class _GeneralWarrantyChip extends StatelessWidget {
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
-                color:
-                    isVigente ? Colors.green.shade800 : Colors.orange.shade800,
+                color: isVigente
+                    ? AppColors.positive(Theme.of(context).brightness)
+                    : AppColors.warning(Theme.of(context).brightness),
               ),
             ),
           ),

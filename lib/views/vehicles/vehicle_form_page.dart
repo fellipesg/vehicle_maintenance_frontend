@@ -326,7 +326,10 @@ class _VehicleFormPageState extends State<VehicleFormPage> {
         Text(
           hint,
           textAlign: TextAlign.center,
-          style: const TextStyle(fontSize: 12, color: Colors.black54),
+          style: TextStyle(
+            fontSize: 12,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
         ),
       ],
     );

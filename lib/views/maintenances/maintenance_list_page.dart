@@ -97,7 +97,7 @@ class _MaintenanceListPageState extends State<MaintenanceListPage> {
                       Icon(
                         Icons.build_outlined,
                         size: 64,
-                        color: Colors.grey.shade400,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
                       const SizedBox(height: 16),
                       Text(
@@ -110,7 +110,9 @@ class _MaintenanceListPageState extends State<MaintenanceListPage> {
                             ? 'Adicione uma manutenção para este veículo'
                             : 'Adicione uma manutenção para começar',
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: Colors.grey.shade600,
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onSurfaceVariant,
                             ),
                       ),
                     ],
