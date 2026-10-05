@@ -57,7 +57,10 @@ class VehicleIdentity extends StatelessWidget {
           )
         else
           Chip(
-            label: const Text('Chassi não informado'),
+            label: const Text(
+              'Chassi não informado',
+              style: TextStyle(color: Color(0xFF92400E)),
+            ),
             backgroundColor: Colors.amber.shade50,
             side: BorderSide(color: Colors.amber.shade300),
           ),

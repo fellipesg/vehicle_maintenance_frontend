@@ -5,10 +5,12 @@ import 'package:provider/provider.dart';
 import 'package:vehicle_maintenance/models/login_portal.dart';
 import 'package:vehicle_maintenance/models/login_result.dart';
 import 'package:vehicle_maintenance/repositories/vehicle_repository.dart';
+import 'package:vehicle_maintenance/services/apple_sign_in.dart';
 import 'package:vehicle_maintenance/services/api_service.dart';
 import 'package:vehicle_maintenance/services/auth_service.dart';
 import 'package:vehicle_maintenance/services/auth_token_storage.dart';
 import 'package:vehicle_maintenance/services/fcm_service.dart';
+import 'package:vehicle_maintenance/services/notification_inbox.dart';
 import 'package:vehicle_maintenance/views/auth/login_hub_page.dart';
 import 'package:vehicle_maintenance/views/auth/login_page.dart';
 import 'package:vehicle_maintenance/views/home_page.dart';
@@ -49,6 +51,10 @@ class RecordingAuthService extends AuthService {
   String? lastEmail;
   String? lastPassword;
   String? lastPortal;
+  String? lastAppleIdentityToken;
+  String? lastAppleNonce;
+  String? lastAppleName;
+  String? lastApplePortal;
 
   @override
   Future<LoginResult> login(
@@ -63,6 +69,21 @@ class RecordingAuthService extends AuthService {
     if (loginHandler != null) {
       return loginHandler!(email, password, portal: portal);
     }
+
+    return const LoginSuccess();
+  }
+
+  @override
+  Future<LoginResult> loginWithApple({
+    required String identityToken,
+    required String rawNonce,
+    String? name,
+    String? portal,
+  }) async {
+    lastAppleIdentityToken = identityToken;
+    lastAppleNonce = rawNonce;
+    lastAppleName = name;
+    lastApplePortal = portal;
 
     return const LoginSuccess();
   }
@@ -105,6 +126,9 @@ Widget buildLoginTestApp({
       ChangeNotifierProvider<VehicleRepository>(
         create: (_) => VehicleRepository(resolvedApi),
       ),
+      ChangeNotifierProvider<NotificationInbox>(
+        create: (_) => NotificationInbox(resolvedApi),
+      ),
     ],
     child: MaterialApp(home: home),
   );
@@ -127,19 +151,24 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('LoginHubPage', () {
-    testWidgets('shows hub copy and all portal cards', (tester) async {
+    testWidgets('shows hub copy and only app-visible portal cards',
+        (tester) async {
       await tester.pumpWidget(
         const MaterialApp(home: LoginHubPage()),
       );
 
       expect(find.text('Como você deseja entrar?'), findsOneWidget);
 
-      for (final portal in LoginPortal.values) {
+      for (final portal in LoginPortal.values.where((p) => p.showInHub)) {
         expect(find.text(portal.hubTitle), findsOneWidget);
+      }
+
+      for (final portal in LoginPortal.values.where((p) => !p.showInHub)) {
+        expect(find.text(portal.hubTitle), findsNothing);
       }
     });
 
-    for (final portal in LoginPortal.values) {
+    for (final portal in LoginPortal.values.where((p) => p.showInHub)) {
       testWidgets('navigates to ${portal.apiValue} login title',
           (tester) async {
         await tester.pumpWidget(
@@ -215,5 +244,74 @@ void main() {
         );
       },
     );
+
+    testWidgets('offers Sign in with Apple above the other social logins',
+        (tester) async {
+      final authService = RecordingAuthService();
+
+      await tester.pumpWidget(
+        buildLoginTestApp(
+          home: LoginPage(
+            portal: LoginPortal.usuario,
+            appleSignInEnabled: true,
+            loadAppleCredential: () async => const AppleSignInCredential(
+              identityToken: 'apple-token',
+              rawNonce: 'raw-nonce',
+              givenName: 'Ana',
+              familyName: 'Silva',
+            ),
+          ),
+          authService: authService,
+        ),
+      );
+
+      expect(find.text('Continuar com a Apple'), findsOneWidget);
+      expect(find.text('Continuar com Google'), findsOneWidget);
+
+      final appleTop =
+          tester.getTopLeft(find.byKey(const Key('login_apple_button'))).dy;
+      final googleTop = tester.getTopLeft(find.text('Continuar com Google')).dy;
+      expect(appleTop, lessThan(googleTop));
+
+      await tester.ensureVisible(find.byKey(const Key('login_apple_button')));
+      await tester.tap(find.byKey(const Key('login_apple_button')));
+      await tester.pumpAndSettle();
+
+      expect(authService.lastAppleIdentityToken, 'apple-token');
+      expect(authService.lastAppleNonce, 'raw-nonce');
+      expect(authService.lastAppleName, 'Ana Silva');
+      expect(authService.lastApplePortal, 'usuario');
+      expect(find.byType(HomePage), findsOneWidget);
+    });
+
+    testWidgets('hides Sign in with Apple when it is disabled', (tester) async {
+      await tester.pumpWidget(
+        buildLoginTestApp(
+          home: const LoginPage(
+            portal: LoginPortal.usuario,
+            appleSignInEnabled: false,
+          ),
+          authService: RecordingAuthService(),
+        ),
+      );
+
+      expect(find.text('Continuar com a Apple'), findsNothing);
+      expect(find.text('Continuar com Google'), findsOneWidget);
+    });
+
+    testWidgets('oficina login does not offer social buttons', (tester) async {
+      await tester.pumpWidget(
+        buildLoginTestApp(
+          home: const LoginPage(
+            portal: LoginPortal.oficina,
+            appleSignInEnabled: true,
+          ),
+          authService: RecordingAuthService(),
+        ),
+      );
+
+      expect(find.text('Continuar com a Apple'), findsNothing);
+      expect(find.text('Continuar com Google'), findsNothing);
+    });
   });
 }

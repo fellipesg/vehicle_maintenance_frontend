@@ -132,7 +132,7 @@ class _RegisterPageState extends State<RegisterPage> {
                       ? 'Conta de lojista / garagem'
                       : 'Conta de proprietário de veículo',
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: Colors.grey.shade600,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
                 ),
                 const SizedBox(height: 24),
@@ -358,14 +358,16 @@ class _RegisterPageState extends State<RegisterPage> {
                   },
                   child: RichText(
                     text: TextSpan(
-                      style: TextStyle(color: Colors.grey.shade700),
-                      children: const [
-                        TextSpan(text: 'Já tem uma conta? '),
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                      children: [
+                        const TextSpan(text: 'Já tem uma conta? '),
                         TextSpan(
                           text: 'Fazer login',
                           style: TextStyle(
                             fontWeight: FontWeight.bold,
-                            color: Colors.blue,
+                            color: Theme.of(context).colorScheme.primary,
                           ),
                         ),
                       ],

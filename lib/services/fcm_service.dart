@@ -22,7 +22,11 @@ class FcmService {
     try {
       print('🔔 Inicializando FCM...');
 
-      // Request permission for notifications
+      if (const bool.fromEnvironment('SCREENSHOTS')) {
+        print('🔔 Permissão de notificações ignorada nesta execução.');
+        return;
+      }
+
       NotificationSettings settings = await messaging.requestPermission(
         alert: true,
         badge: true,

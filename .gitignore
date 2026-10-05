@@ -47,3 +47,7 @@ app.*.map.json
 # Firebase configuration files (contain sensitive keys)
 /android/app/google-services.json
 /lib/firebase_options.dart
+
+# Play upload key. Never commit.
+/android/key.properties
+/android/upload-keystore.jks

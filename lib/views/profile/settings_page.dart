@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../services/auth_service.dart';
+import '../../theme/theme_controller.dart';
 import '../auth/login_hub_page.dart';
 
 class SettingsPage extends StatefulWidget {
@@ -135,6 +136,8 @@ class _SettingsPageState extends State<SettingsPage> {
 
   @override
   Widget build(BuildContext context) {
+    final themeController = context.watch<ThemeController>();
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Configurações'),
@@ -142,6 +145,38 @@ class _SettingsPageState extends State<SettingsPage> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          const _SectionHeader(title: 'Aparência'),
+          Card(
+            child: Column(
+              children: [
+                _ThemeModeTile(
+                  mode: ThemeMode.light,
+                  selected: themeController.mode == ThemeMode.light,
+                  icon: Icons.light_mode_outlined,
+                  title: 'Claro',
+                  onSelected: themeController.setMode,
+                ),
+                const Divider(height: 1),
+                _ThemeModeTile(
+                  mode: ThemeMode.dark,
+                  selected: themeController.mode == ThemeMode.dark,
+                  icon: Icons.dark_mode_outlined,
+                  title: 'Escuro',
+                  onSelected: themeController.setMode,
+                ),
+                const Divider(height: 1),
+                _ThemeModeTile(
+                  mode: ThemeMode.system,
+                  selected: themeController.mode == ThemeMode.system,
+                  icon: Icons.brightness_auto_outlined,
+                  title: 'Sistema',
+                  subtitle: 'Segue a aparência do aparelho',
+                  onSelected: themeController.setMode,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 24),
           const _SectionHeader(title: 'Segurança'),
           Card(
             child: Column(
@@ -235,6 +270,41 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 }
 
+class _ThemeModeTile extends StatelessWidget {
+  const _ThemeModeTile({
+    required this.mode,
+    required this.selected,
+    required this.icon,
+    required this.title,
+    required this.onSelected,
+    this.subtitle,
+  });
+
+  final ThemeMode mode;
+  final bool selected;
+  final IconData icon;
+  final String title;
+  final String? subtitle;
+  final Future<void> Function(ThemeMode mode) onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
+    return ListTile(
+      key: Key('theme_mode_${mode.name}'),
+      leading: Icon(icon),
+      title: Text(title),
+      subtitle: subtitle == null ? null : Text(subtitle!),
+      trailing: Icon(
+        selected ? Icons.check_circle : Icons.circle_outlined,
+        color: selected ? scheme.primary : scheme.outline,
+      ),
+      onTap: () => onSelected(mode),
+    );
+  }
+}
+
 class _SectionHeader extends StatelessWidget {
   const _SectionHeader({required this.title});
 
@@ -248,7 +318,7 @@ class _SectionHeader extends StatelessWidget {
         title,
         style: Theme.of(context).textTheme.titleSmall?.copyWith(
               fontWeight: FontWeight.bold,
-              color: Colors.grey.shade700,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
       ),
     );

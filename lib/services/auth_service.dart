@@ -271,6 +271,44 @@ class AuthService {
     }
   }
 
+  Future<LoginResult> loginWithApple({
+    required String identityToken,
+    required String rawNonce,
+    String? name,
+    String? portal,
+  }) async {
+    try {
+      final response = await _apiService.dio.post(
+        '/auth/apple',
+        data: {
+          'identity_token': identityToken,
+          'nonce': rawNonce,
+          if (name != null && name.isNotEmpty) 'name': name,
+          if (portal != null) 'portal': portal,
+        },
+      );
+
+      final result = await _parseAuthResponse(response.data);
+      if (result is LoginFailure) {
+        final message =
+            response.data is Map ? response.data['message']?.toString() : null;
+        throw Exception(message ?? 'Unable to authenticate with Apple.');
+      }
+
+      return result;
+    } on DioException catch (e) {
+      final message = e.response?.data is Map
+          ? e.response?.data['message']?.toString()
+          : null;
+      throw Exception(message ?? 'Unable to authenticate with Apple.');
+    } catch (e) {
+      if (e is Exception) {
+        rethrow;
+      }
+      throw Exception('Unable to authenticate with Apple.');
+    }
+  }
+
   Future<bool> loginWithSSO(String provider) async {
     // This method is kept for backward compatibility
     // The actual OAuth flow is handled by opening the URL in native browser

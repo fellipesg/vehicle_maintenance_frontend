@@ -52,6 +52,9 @@ extension LoginPortalX on LoginPortal {
         LoginPortal.admin => const Color(0xFFEA580C),
       };
 
+  bool get showInHub =>
+      this == LoginPortal.usuario || this == LoginPortal.lojista;
+
   bool get canRegister =>
       this == LoginPortal.usuario || this == LoginPortal.lojista;
 

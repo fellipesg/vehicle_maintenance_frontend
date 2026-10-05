@@ -42,7 +42,7 @@ class LoginHubPage extends StatelessWidget {
                     ),
               ),
               const SizedBox(height: 24),
-              ...LoginPortal.values.map(
+              ...LoginPortal.values.where((p) => p.showInHub).map(
                 (portal) => Padding(
                   padding: const EdgeInsets.only(bottom: 12),
                   child: _PortalCard(

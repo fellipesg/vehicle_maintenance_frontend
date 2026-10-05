@@ -8,6 +8,8 @@ import '../../widgets/user_avatar.dart';
 import '../../widgets/vehicle_cover_avatar.dart';
 import '../../widgets/vehicle_identity.dart';
 import 'auth/login_hub_page.dart';
+import 'notifications/notifications_page.dart';
+import '../services/notification_inbox.dart';
 import 'profile/profile_edit_page.dart';
 import 'profile/settings_page.dart';
 import 'vehicles/vehicle_form_page.dart';
@@ -29,7 +31,15 @@ class _HomePageState extends State<HomePage> {
     const ProfilePage(),
   ];
 
-  static const Color _brandNavy = Color(0xFF0B1C2C);
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        context.read<NotificationInbox>().refreshUnreadCount();
+      }
+    });
+  }
 
   bool _onScrollNotification(ScrollNotification notification) {
     if (_selectedIndex != 0) {
@@ -56,9 +66,7 @@ class _HomePageState extends State<HomePage> {
           child: RevisalogLockupHorizontal(height: 32),
         ),
         centerTitle: false,
-        backgroundColor: _brandNavy,
-        foregroundColor: Colors.white,
-        surfaceTintColor: Colors.transparent,
+        actions: const [NotificationBellButton()],
         scrolledUnderElevation: 0,
         shape: _vehiclesListScrolled
             ? const Border(
@@ -159,7 +167,7 @@ class _VehiclesPageState extends State<VehiclesPage> {
             Icon(
               Icons.directions_car_outlined,
               size: 64,
-              color: Colors.grey.shade400,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
             const SizedBox(height: 16),
             Text(
@@ -174,7 +182,7 @@ class _VehiclesPageState extends State<VehiclesPage> {
                   ? 'Quando houver cadastros, eles aparecerão aqui'
                   : 'Adicione um veículo para começar',
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Colors.grey.shade600,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
             ),
             if (!isAdmin) ...[
@@ -355,7 +363,7 @@ class _ProfilePageState extends State<ProfilePage> {
               Text(
                 user?['email'] ?? '',
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Colors.grey.shade600,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
                 textAlign: TextAlign.center,
               ),
