@@ -3,13 +3,13 @@
 <plist version="1.0">
 <dict>
 	<key>API_KEY</key>
-	<string>AIzaSyD7V8uyA9PC0zsh7r3SEQ5qM1OgG1ggGCo</string>
+	<string>AIzaSyBoAxyIoLssXY4dLYpg77GPggAUvZGROj0</string>
 	<key>GCM_SENDER_ID</key>
 	<string>61844221484</string>
 	<key>PLIST_VERSION</key>
 	<string>1</string>
 	<key>BUNDLE_ID</key>
-	<string>com.example.vehicleMaintenance</string>
+	<string>br.com.revisalog.app</string>
 	<key>PROJECT_ID</key>
 	<string>vehicle-maintenance-a9e32</string>
 	<key>STORAGE_BUCKET</key>
@@ -25,6 +25,6 @@
 	<key>IS_SIGNIN_ENABLED</key>
 	<true></true>
 	<key>GOOGLE_APP_ID</key>
-	<string>1:61844221484:ios:a6bbf4945e5805e84c2b89</string>
+	<string>1:61844221484:ios:d795c6638f834abb4c2b89</string>
 </dict>
 </plist>
