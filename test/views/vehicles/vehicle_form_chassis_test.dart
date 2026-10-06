@@ -95,6 +95,9 @@ void main() {
     final vehicle = Vehicle(
       id: 9,
       licensePlate: 'ABC1D23',
+      // Todo veículo tem RENAVAM (coluna NOT NULL) e o campo é obrigatório no
+      // formulário, então sem ele o submit nem chega no diálogo de placa.
+      renavam: '12345678901',
       brand: 'VW',
       model: 'Gol',
       year: 2020,

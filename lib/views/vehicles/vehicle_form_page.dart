@@ -140,6 +140,24 @@ class _VehicleFormPageState extends State<VehicleFormPage> {
     super.dispose();
   }
 
+  /// O backend exige RENAVAM nos dois casos, e o campo não tinha validator — dava
+  /// para salvar vazio e receber um 422. No cadastro exige 11 dígitos, como o
+  /// portal web (`digits:11`); na edição só exige não-vazio, porque a API aceitou
+  /// `max:20` por um tempo e enforcar 11 dígitos travaria esses valores antigos.
+  String? _validateRenavam(String? value) {
+    final renavam = value?.trim() ?? '';
+
+    if (renavam.isEmpty) {
+      return 'RENAVAM é obrigatório';
+    }
+
+    if (widget.vehicle == null && !RegExp(r'^\d{11}$').hasMatch(renavam)) {
+      return 'RENAVAM deve ter 11 dígitos';
+    }
+
+    return null;
+  }
+
   Future<void> _handleSubmit() async {
     if (!_formKey.currentState!.validate()) {
       return;
@@ -190,9 +208,9 @@ class _VehicleFormPageState extends State<VehicleFormPage> {
       final apiService = Provider.of<ApiService>(context, listen: false);
       final vehicleData = {
         'license_plate': newPlate,
-        'renavam': _renavamController.text.trim().isEmpty
-            ? null
-            : _renavamController.text.trim(),
+        // Nunca `null`: a regra é `sometimes|required`, então mandar a chave
+        // vazia fazia a edição falhar com 422 em vez de deixar o valor como está.
+        'renavam': _renavamController.text.trim(),
         'brand': _brandController.text.trim(),
         'model': _modelController.text.trim(),
         'year': int.parse(_yearController.text.trim()),
@@ -433,11 +451,12 @@ class _VehicleFormPageState extends State<VehicleFormPage> {
                 TextFormField(
                   controller: _renavamController,
                   decoration: const InputDecoration(
-                    labelText: 'RENAVAM',
+                    labelText: 'RENAVAM *',
                     prefixIcon: Icon(Icons.badge),
                     border: OutlineInputBorder(),
                   ),
                   keyboardType: TextInputType.number,
+                  validator: _validateRenavam,
                 ),
                 const SizedBox(height: 16),
                 Row(

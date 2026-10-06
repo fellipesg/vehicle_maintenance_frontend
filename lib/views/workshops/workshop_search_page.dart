@@ -1,7 +1,11 @@
+import 'dart:async';
+
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../models/workshop.dart';
 import '../../services/api_service.dart';
+import '../../widgets/load_more_button.dart';
 import 'workshop_form_page.dart';
 
 class WorkshopSearchPage extends StatefulWidget {
@@ -17,11 +21,16 @@ class WorkshopSearchPage extends StatefulWidget {
 }
 
 class _WorkshopSearchPageState extends State<WorkshopSearchPage> {
+  static const Duration _searchDebounce = Duration(milliseconds: 400);
+
   final _searchController = TextEditingController();
   List<Workshop> _workshops = [];
-  List<Workshop> _filteredWorkshops = [];
   bool _isLoading = false;
+  bool _isLoadingMore = false;
   bool _isSearching = false;
+  Timer? _debounce;
+  int _loadedPage = 1;
+  int? _lastPage;
 
   @override
   void initState() {
@@ -32,27 +41,35 @@ class _WorkshopSearchPageState extends State<WorkshopSearchPage> {
 
   @override
   void dispose() {
+    _debounce?.cancel();
     _searchController.dispose();
     super.dispose();
   }
 
+  bool get _hasMore => _lastPage != null && _loadedPage < _lastPage!;
+
+  /// A busca é do servidor (`?search=`), não um filtro sobre o que já chegou:
+  /// a resposta é paginada, então filtrar localmente só varria a primeira
+  /// página e dava "nenhuma oficina encontrada" para quem estava na segunda.
   void _onSearchChanged() {
-    final query = _searchController.text.toLowerCase().trim();
-    if (query.isEmpty) {
-      setState(() {
-        _filteredWorkshops = _workshops;
-        _isSearching = false;
-      });
-    } else {
-      setState(() {
-        _isSearching = true;
-        _filteredWorkshops = _workshops.where((workshop) {
-          return workshop.name.toLowerCase().contains(query) ||
-              workshop.city.toLowerCase().contains(query) ||
-              workshop.neighborhood.toLowerCase().contains(query);
-        }).toList();
-      });
-    }
+    final query = _searchController.text.trim();
+
+    setState(() {
+      _isSearching = query.isNotEmpty;
+    });
+
+    _debounce?.cancel();
+    _debounce = Timer(_searchDebounce, _loadWorkshops);
+  }
+
+  Future<Response> _fetchPage(int page) {
+    final apiService = Provider.of<ApiService>(context, listen: false);
+    final query = _searchController.text.trim();
+
+    return apiService.getWorkshops(
+      page: page,
+      queryParams: query.isNotEmpty ? {'search': query} : null,
+    );
   }
 
   Future<void> _loadWorkshops() async {
@@ -61,19 +78,17 @@ class _WorkshopSearchPageState extends State<WorkshopSearchPage> {
     });
 
     try {
-      final apiService = Provider.of<ApiService>(context, listen: false);
-      final query = _searchController.text.trim();
-
-      final response = await apiService.getWorkshops(
-        queryParams: query.isNotEmpty ? {'search': query} : null,
-      );
+      final response = await _fetchPage(1);
 
       if (response.data['success'] == true) {
+        if (!mounted) {
+          return;
+        }
+
         setState(() {
-          _workshops = (response.data['data'] as List)
-              .map((json) => Workshop.fromJson(json))
-              .toList();
-          _filteredWorkshops = _workshops;
+          _workshops = _parsePage(response.data['data']);
+          _loadedPage = 1;
+          _lastPage = _lastPageFrom(response.data);
           _isLoading = false;
         });
       } else {
@@ -93,6 +108,83 @@ class _WorkshopSearchPageState extends State<WorkshopSearchPage> {
         );
       }
     }
+  }
+
+  Future<void> _loadMore() async {
+    if (_isLoadingMore || !_hasMore) {
+      return;
+    }
+
+    setState(() {
+      _isLoadingMore = true;
+    });
+
+    final nextPage = _loadedPage + 1;
+
+    try {
+      final response = await _fetchPage(nextPage);
+
+      if (!mounted) {
+        return;
+      }
+
+      if (response.data['success'] == true) {
+        final knownIds = _workshops.map((workshop) => workshop.id).toSet();
+
+        setState(() {
+          _workshops = [
+            ..._workshops,
+            ..._parsePage(response.data['data'])
+                .where((workshop) => !knownIds.contains(workshop.id)),
+          ];
+          _loadedPage = nextPage;
+          _lastPage = _lastPageFrom(response.data) ?? _lastPage;
+          _isLoadingMore = false;
+        });
+      } else {
+        setState(() {
+          _isLoadingMore = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoadingMore = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erro ao carregar mais oficinas: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  List<Workshop> _parsePage(dynamic data) {
+    if (data is! List) {
+      return const [];
+    }
+
+    return data.map((json) => Workshop.fromJson(json)).toList();
+  }
+
+  static int? _lastPageFrom(dynamic envelope) {
+    if (envelope is! Map) {
+      return null;
+    }
+
+    final meta = envelope['meta'];
+    if (meta is! Map) {
+      return null;
+    }
+
+    final lastPage = meta['last_page'];
+    if (lastPage is int) {
+      return lastPage;
+    }
+
+    return int.tryParse(lastPage?.toString() ?? '');
   }
 
   void _selectWorkshop(Workshop workshop) {
@@ -151,7 +243,11 @@ class _WorkshopSearchPageState extends State<WorkshopSearchPage> {
                     : null,
                 border: const OutlineInputBorder(),
               ),
-              onSubmitted: (_) => _loadWorkshops(),
+              onSubmitted: (_) {
+                // Busca agora, sem esperar (e sem deixar o debounce repetir).
+                _debounce?.cancel();
+                _loadWorkshops();
+              },
             ),
           ),
           if (_isLoading)
@@ -160,7 +256,7 @@ class _WorkshopSearchPageState extends State<WorkshopSearchPage> {
                 child: CircularProgressIndicator(),
               ),
             )
-          else if (_filteredWorkshops.isEmpty)
+          else if (_workshops.isEmpty)
             Expanded(
               child: Center(
                 child: Column(
@@ -196,9 +292,16 @@ class _WorkshopSearchPageState extends State<WorkshopSearchPage> {
           else
             Expanded(
               child: ListView.builder(
-                itemCount: _filteredWorkshops.length,
+                itemCount: _workshops.length + (_hasMore ? 1 : 0),
                 itemBuilder: (context, index) {
-                  final workshop = _filteredWorkshops[index];
+                  if (index == _workshops.length) {
+                    return LoadMoreButton(
+                      isLoading: _isLoadingMore,
+                      onPressed: _loadMore,
+                    );
+                  }
+
+                  final workshop = _workshops[index];
                   return Card(
                     margin: const EdgeInsets.symmetric(
                       horizontal: 16,

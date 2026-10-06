@@ -14,6 +14,7 @@ import 'profile/profile_edit_page.dart';
 import 'profile/settings_page.dart';
 import 'vehicles/vehicle_form_page.dart';
 import 'vehicles/vehicle_detail_page.dart';
+import '../widgets/load_more_button.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -230,8 +231,16 @@ class _VehiclesPageState extends State<VehiclesPage> {
               onRefresh: () => _refresh(repository),
               child: ListView.builder(
                 padding: const EdgeInsets.all(16),
-                itemCount: vehicles.length,
+                itemCount: vehicles.length + (repository.hasMore ? 1 : 0),
                 itemBuilder: (context, index) {
+                  if (index == vehicles.length) {
+                    return LoadMoreButton(
+                      isLoading: repository.isLoadingMore,
+                      onPressed: () =>
+                          context.read<VehicleRepository>().loadMore(),
+                    );
+                  }
+
                   final vehicle = vehicles[index];
                   final maintenances = vehicle.maintenances ?? [];
 
