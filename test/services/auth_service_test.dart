@@ -268,6 +268,51 @@ void main() {
       expect(authService.user?['email'], 'relay@privaterelay.appleid.com');
     });
 
+    test('loginWithGoogle posts the id token and stores the session',
+        () async {
+      Map<String, dynamic>? body;
+      apiService.dio.interceptors.add(
+        InterceptorsWrapper(
+          onRequest: (options, handler) {
+            if (options.path == '/auth/google' && options.method == 'POST') {
+              body = Map<String, dynamic>.from(options.data as Map);
+              handler.resolve(
+                Response(
+                  requestOptions: options,
+                  data: {
+                    'success': true,
+                    'data': {
+                      'token': 'google-session',
+                      'token_type': 'Bearer',
+                      'user': {
+                        'id': 10,
+                        'email': 'ana@gmail.com',
+                        'user_type': 'user',
+                      },
+                    },
+                  },
+                ),
+              );
+              return;
+            }
+
+            handler.next(options);
+          },
+        ),
+      );
+
+      final result = await authService.loginWithGoogle(
+        idToken: 'google-id',
+        portal: 'usuario',
+      );
+
+      expect(result, isA<LoginSuccess>());
+      expect(body?['id_token'], 'google-id');
+      expect(body?['portal'], 'usuario');
+      expect(tokenStorage.token, 'google-session');
+      expect(authService.user?['email'], 'ana@gmail.com');
+    });
+
     test('loadStoredAuth keeps user profile in SharedPreferences', () async {
       SharedPreferences.setMockInitialValues({
         'user_data': '{"id":1,"name":"Test User"}',

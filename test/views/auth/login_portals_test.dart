@@ -55,6 +55,8 @@ class RecordingAuthService extends AuthService {
   String? lastAppleNonce;
   String? lastAppleName;
   String? lastApplePortal;
+  String? lastGoogleIdToken;
+  String? lastGooglePortal;
 
   @override
   Future<LoginResult> login(
@@ -84,6 +86,17 @@ class RecordingAuthService extends AuthService {
     lastAppleNonce = rawNonce;
     lastAppleName = name;
     lastApplePortal = portal;
+
+    return const LoginSuccess();
+  }
+
+  @override
+  Future<LoginResult> loginWithGoogle({
+    required String idToken,
+    String? portal,
+  }) async {
+    lastGoogleIdToken = idToken;
+    lastGooglePortal = portal;
 
     return const LoginSuccess();
   }
@@ -297,6 +310,71 @@ void main() {
 
       expect(find.text('Continuar com a Apple'), findsNothing);
       expect(find.text('Continuar com Google'), findsOneWidget);
+    });
+
+    testWidgets('signs in with Google using the native id token',
+        (tester) async {
+      final authService = RecordingAuthService();
+
+      await tester.pumpWidget(
+        buildLoginTestApp(
+          home: LoginPage(
+            portal: LoginPortal.usuario,
+            appleSignInEnabled: false,
+            loadGoogleToken: () async => 'google-id-token',
+          ),
+          authService: authService,
+        ),
+      );
+
+      await tester.ensureVisible(find.text('Continuar com Google'));
+      await tester.tap(find.text('Continuar com Google'));
+      await tester.pumpAndSettle();
+
+      expect(authService.lastGoogleIdToken, 'google-id-token');
+      expect(authService.lastGooglePortal, 'usuario');
+      expect(find.byType(HomePage), findsOneWidget);
+    });
+
+    testWidgets('stays on the login page when Google sign-in is cancelled',
+        (tester) async {
+      final authService = RecordingAuthService();
+
+      await tester.pumpWidget(
+        buildLoginTestApp(
+          home: LoginPage(
+            portal: LoginPortal.usuario,
+            appleSignInEnabled: false,
+            loadGoogleToken: () async => null,
+          ),
+          authService: authService,
+        ),
+      );
+
+      await tester.ensureVisible(find.text('Continuar com Google'));
+      await tester.tap(find.text('Continuar com Google'));
+      await tester.pumpAndSettle();
+
+      expect(authService.lastGoogleIdToken, isNull);
+      expect(find.byType(HomePage), findsNothing);
+      expect(find.byType(LoginPage), findsOneWidget);
+    });
+
+    testWidgets('hides browser-based Facebook and X login by default',
+        (tester) async {
+      await tester.pumpWidget(
+        buildLoginTestApp(
+          home: const LoginPage(
+            portal: LoginPortal.usuario,
+            appleSignInEnabled: false,
+          ),
+          authService: RecordingAuthService(),
+        ),
+      );
+
+      expect(find.text('Continuar com Google'), findsOneWidget);
+      expect(find.text('Continuar com Facebook'), findsNothing);
+      expect(find.text('Continuar com Twitter/X'), findsNothing);
     });
 
     testWidgets('oficina login does not offer social buttons', (tester) async {
