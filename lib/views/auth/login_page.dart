@@ -8,6 +8,7 @@ import '../home_page.dart';
 import '../../models/login_portal.dart';
 import '../../models/login_result.dart';
 import '../../services/apple_sign_in.dart';
+import '../../services/google_sign_in.dart';
 import '../../services/auth_service.dart';
 import 'oauth_webview_page.dart';
 import 'register_page.dart';
@@ -19,6 +20,8 @@ class LoginPage extends StatefulWidget {
     this.portal = LoginPortal.usuario,
     this.appleSignInEnabled,
     this.loadAppleCredential = loadAppleSignInCredential,
+    this.loadGoogleToken = loadGoogleIdToken,
+    this.browserSocialLoginEnabled = false,
   });
 
   final LoginPortal portal;
@@ -27,6 +30,13 @@ class LoginPage extends StatefulWidget {
   final bool? appleSignInEnabled;
 
   final AppleCredentialLoader loadAppleCredential;
+
+  /// Login nativo com Google (google_sign_in): devolve o ID token ou null se cancelar.
+  final GoogleIdTokenLoader loadGoogleToken;
+
+  /// Facebook e X pelo navegador: o login não volta ao app e a API responde OAUTH_NOT_CONFIGURED.
+  /// Ficam escondidos até ganharem login nativo, como o Google.
+  final bool browserSocialLoginEnabled;
 
   @override
   State<LoginPage> createState() => _LoginPageState();
@@ -116,6 +126,9 @@ class _LoginPageState extends State<LoginPage> {
         raw.contains('does not have access to this portal')) {
       return 'Esta conta não tem acesso a este portal.';
     }
+    if (raw.contains('Unable to authenticate with Google')) {
+      return 'Não foi possível entrar com o Google. Tente novamente.';
+    }
     if (raw.contains('Unable to authenticate with Apple')) {
       return 'Não foi possível entrar com a Apple. Tente novamente.';
     }
@@ -177,6 +190,68 @@ class _LoginPageState extends State<LoginPage> {
             const SnackBar(
               content:
                   Text('Não foi possível entrar com a Apple. Tente novamente.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(_friendlyError(e)),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _handleGoogleLogin() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final idToken = await widget.loadGoogleToken();
+      if (idToken == null || !mounted) {
+        return;
+      }
+
+      final authService = Provider.of<AuthService>(context, listen: false);
+      final result = await authService.loginWithGoogle(
+        idToken: idToken,
+        portal: _portal.apiValue,
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      switch (result) {
+        case LoginSuccess():
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(builder: (_) => const HomePage()),
+            (route) => false,
+          );
+        case LoginNeedsTwoFactor(:final challengeToken):
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => TwoFactorChallengePage(
+                challengeToken: challengeToken,
+              ),
+            ),
+          );
+        case LoginFailure():
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                  'Não foi possível entrar com o Google. Tente novamente.'),
               backgroundColor: Colors.red,
             ),
           );
@@ -419,34 +494,35 @@ class _LoginPageState extends State<LoginPage> {
                     const SizedBox(height: 12),
                   ],
                   OutlinedButton.icon(
-                    onPressed:
-                        _isLoading ? null : () => _handleSSOLogin('google'),
+                    onPressed: _isLoading ? null : () => _handleGoogleLogin(),
                     icon: const Icon(Icons.g_mobiledata, size: 28),
                     label: const Text('Continuar com Google'),
                     style: OutlinedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 16),
                     ),
                   ),
-                  const SizedBox(height: 12),
-                  OutlinedButton.icon(
-                    onPressed:
-                        _isLoading ? null : () => _handleSSOLogin('facebook'),
-                    icon: const Icon(Icons.facebook, size: 28),
-                    label: const Text('Continuar com Facebook'),
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
+                  if (widget.browserSocialLoginEnabled) ...[
+                    const SizedBox(height: 12),
+                    OutlinedButton.icon(
+                      onPressed:
+                          _isLoading ? null : () => _handleSSOLogin('facebook'),
+                      icon: const Icon(Icons.facebook, size: 28),
+                      label: const Text('Continuar com Facebook'),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 12),
-                  OutlinedButton.icon(
-                    onPressed:
-                        _isLoading ? null : () => _handleSSOLogin('twitter'),
-                    icon: const Icon(Icons.alternate_email, size: 28),
-                    label: const Text('Continuar com Twitter/X'),
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
+                    const SizedBox(height: 12),
+                    OutlinedButton.icon(
+                      onPressed:
+                          _isLoading ? null : () => _handleSSOLogin('twitter'),
+                      icon: const Icon(Icons.alternate_email, size: 28),
+                      label: const Text('Continuar com Twitter/X'),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                      ),
                     ),
-                  ),
+                  ],
                 ],
                 const SizedBox(height: 24),
                 TextButton(

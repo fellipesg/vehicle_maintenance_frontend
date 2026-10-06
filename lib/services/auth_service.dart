@@ -271,6 +271,40 @@ class AuthService {
     }
   }
 
+  Future<LoginResult> loginWithGoogle({
+    required String idToken,
+    String? portal,
+  }) async {
+    try {
+      final response = await _apiService.dio.post(
+        '/auth/google',
+        data: {
+          'id_token': idToken,
+          if (portal != null) 'portal': portal,
+        },
+      );
+
+      final result = await _parseAuthResponse(response.data);
+      if (result is LoginFailure) {
+        final message =
+            response.data is Map ? response.data['message']?.toString() : null;
+        throw Exception(message ?? 'Unable to authenticate with Google.');
+      }
+
+      return result;
+    } on DioException catch (e) {
+      final message = e.response?.data is Map
+          ? e.response?.data['message']?.toString()
+          : null;
+      throw Exception(message ?? 'Unable to authenticate with Google.');
+    } catch (e) {
+      if (e is Exception) {
+        rethrow;
+      }
+      throw Exception('Unable to authenticate with Google.');
+    }
+  }
+
   Future<LoginResult> loginWithApple({
     required String identityToken,
     required String rawNonce,
