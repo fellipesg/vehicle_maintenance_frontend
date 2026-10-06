@@ -169,6 +169,27 @@ class ApiService {
     return await _dio.put('/vehicles/$id', data: data);
   }
 
+  /// Reivindica um veículo já cadastrado. A placa e o RENAVAM são a prova de
+  /// posse e o backend os confere contra o documento do veículo
+  /// (`VehicleOwnershipService::documentMatchesVehicle`), respondendo 422 com
+  /// uma mensagem genérica quando não batem.
+  Future<Response> linkVehicle(
+    String id, {
+    required String licensePlate,
+    required String renavam,
+    DateTime? purchaseDate,
+  }) async {
+    return await _dio.post(
+      '/vehicles/$id/link',
+      data: {
+        'license_plate': licensePlate,
+        'renavam': renavam,
+        if (purchaseDate != null)
+          'purchase_date': purchaseDate.toIso8601String().split('T').first,
+      },
+    );
+  }
+
   Future<Response> deleteVehicle(String id) async {
     return await _dio.delete('/vehicles/$id');
   }

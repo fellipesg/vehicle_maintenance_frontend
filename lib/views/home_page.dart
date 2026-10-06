@@ -13,6 +13,7 @@ import '../services/notification_inbox.dart';
 import 'profile/profile_edit_page.dart';
 import 'profile/settings_page.dart';
 import 'vehicles/vehicle_form_page.dart';
+import 'vehicles/vehicle_link_page.dart';
 import 'vehicles/vehicle_detail_page.dart';
 import '../widgets/load_more_button.dart';
 
@@ -133,6 +134,19 @@ class _VehiclesPageState extends State<VehiclesPage> {
     return repository.load(force: true);
   }
 
+  /// Caminho para reivindicar um veículo que outra pessoa já cadastrou — é o que
+  /// a mensagem de chassi duplicado manda procurar.
+  Widget _linkVehicleButton(BuildContext context) {
+    return TextButton.icon(
+      key: const Key('link_vehicle_entry'),
+      onPressed: () => Navigator.of(context).push(
+        MaterialPageRoute<void>(builder: (_) => const VehicleLinkPage()),
+      ),
+      icon: const Icon(Icons.link),
+      label: const Text('Vincular veículo já cadastrado'),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Consumer<VehicleRepository>(
@@ -202,6 +216,8 @@ class _VehiclesPageState extends State<VehiclesPage> {
                 icon: const Icon(Icons.add),
                 label: const Text('Adicionar Veículo'),
               ),
+              const SizedBox(height: 8),
+              _linkVehicleButton(context),
             ],
           ],
         ),
@@ -231,13 +247,23 @@ class _VehiclesPageState extends State<VehiclesPage> {
               onRefresh: () => _refresh(repository),
               child: ListView.builder(
                 padding: const EdgeInsets.all(16),
-                itemCount: vehicles.length + (repository.hasMore ? 1 : 0),
+                itemCount: vehicles.length +
+                    (repository.hasMore ? 1 : 0) +
+                    (isAdmin ? 0 : 1),
                 itemBuilder: (context, index) {
-                  if (index == vehicles.length) {
+                  if (repository.hasMore && index == vehicles.length) {
                     return LoadMoreButton(
                       isLoading: repository.isLoadingMore,
                       onPressed: () =>
                           context.read<VehicleRepository>().loadMore(),
+                    );
+                  }
+
+                  // Último item: reivindicar um veículo que já existe na base.
+                  if (index >= vehicles.length) {
+                    return Padding(
+                      padding: const EdgeInsets.only(top: 8, bottom: 24),
+                      child: _linkVehicleButton(context),
                     );
                   }
 
