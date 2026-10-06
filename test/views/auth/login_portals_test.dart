@@ -392,4 +392,45 @@ void main() {
       expect(find.text('Continuar com Google'), findsNothing);
     });
   });
+
+  group('self-registration', () {
+    test('only vehicle owners can self-register', () {
+      // O backend recusa auto-cadastro de garage/workshop, então oferecer o
+      // botão nesses portais só levava a um 422.
+      expect(LoginPortal.usuario.canRegister, isTrue);
+
+      for (final portal
+          in LoginPortal.values.where((p) => p != LoginPortal.usuario)) {
+        expect(
+          portal.canRegister,
+          isFalse,
+          reason: '${portal.apiValue} não pode se auto-cadastrar na API',
+        );
+      }
+    });
+
+    testWidgets('usuario portal offers the register button', (tester) async {
+      await tester.pumpWidget(
+        buildLoginTestApp(
+          home: const LoginPage(portal: LoginPortal.usuario),
+          authService: RecordingAuthService(),
+        ),
+      );
+
+      expect(find.text(LoginPortal.usuario.registerCta), findsOneWidget);
+    });
+
+    testWidgets('lojista portal does not offer the register button',
+        (tester) async {
+      await tester.pumpWidget(
+        buildLoginTestApp(
+          home: const LoginPage(portal: LoginPortal.lojista),
+          authService: RecordingAuthService(),
+        ),
+      );
+
+      expect(find.text('Cadastre sua loja'), findsNothing);
+      expect(find.text(LoginPortal.lojista.registerCta), findsNothing);
+    });
+  });
 }

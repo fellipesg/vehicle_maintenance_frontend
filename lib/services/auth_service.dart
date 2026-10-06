@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/login_result.dart';
 import '../repositories/vehicle_repository.dart';
+import 'api_error.dart';
 import 'api_service.dart';
 import 'auth_token_storage.dart';
 import 'fcm_service.dart';
@@ -103,7 +104,6 @@ class AuthService {
     required String name,
     required String email,
     required String password,
-    String userType = 'user',
     String? phone,
     String? postalCode,
     String? street,
@@ -121,7 +121,6 @@ class AuthService {
           'email': email,
           'password': password,
           'password_confirmation': password,
-          'user_type': userType,
           'phone': phone,
           'postal_code': postalCode,
           'street': street,
@@ -145,8 +144,9 @@ class AuthService {
         return true;
       }
       return false;
-    } catch (e) {
-      throw Exception('Erro ao registrar: $e');
+    } on DioException catch (e) {
+      // 422 do backend traz e-mail já cadastrado, senha curta etc. em `errors`.
+      throw ApiException.from(e, fallback: 'Erro ao registrar');
     }
   }
 
@@ -164,10 +164,7 @@ class AuthService {
 
       return _parseAuthResponse(response.data);
     } on DioException catch (e) {
-      final message = e.response?.data is Map
-          ? e.response?.data['message']?.toString()
-          : null;
-      throw Exception(message ?? 'Erro ao fazer login');
+      throw ApiException.from(e, fallback: 'Erro ao fazer login');
     } catch (e) {
       throw Exception('Erro ao fazer login: $e');
     }
@@ -191,10 +188,7 @@ class AuthService {
       final result = await _parseAuthResponse(response.data);
       return result is LoginSuccess;
     } on DioException catch (e) {
-      final message = e.response?.data is Map
-          ? e.response?.data['message']?.toString()
-          : null;
-      throw Exception(message ?? 'Código de verificação inválido');
+      throw ApiException.from(e, fallback: 'Código de verificação inválido');
     } catch (e) {
       throw Exception('Erro ao verificar autenticação em duas etapas: $e');
     }
@@ -331,10 +325,7 @@ class AuthService {
 
       return result;
     } on DioException catch (e) {
-      final message = e.response?.data is Map
-          ? e.response?.data['message']?.toString()
-          : null;
-      throw Exception(message ?? 'Unable to authenticate with Apple.');
+      throw ApiException.from(e, fallback: 'Unable to authenticate with Apple.');
     } catch (e) {
       if (e is Exception) {
         rethrow;
@@ -411,11 +402,18 @@ class AuthService {
 
       throw Exception('Não foi possível excluir a conta');
     } on DioException catch (e) {
-      final message = e.response?.data is Map
-          ? e.response?.data['message']?.toString()
-          : null;
-      throw Exception(message ?? 'Não foi possível excluir a conta');
+      throw ApiException.from(e, fallback: 'Não foi possível excluir a conta');
     }
+  }
+
+  /// Sessão recusada pelo backend (401). Limpa o estado local sem chamar
+  /// `/logout`: o token já não vale, e a chamada só traria outro 401.
+  Future<void> handleUnauthorized() async {
+    if (_token == null && _user == null) {
+      return;
+    }
+
+    await _clearLocalSession();
   }
 
   Future<void> _clearLocalSession() async {
@@ -479,10 +477,7 @@ class AuthService {
 
       return false;
     } on DioException catch (e) {
-      final message = e.response?.data is Map
-          ? e.response?.data['message']?.toString()
-          : null;
-      throw Exception(message ?? 'Erro ao atualizar perfil');
+      throw ApiException.from(e, fallback: 'Erro ao atualizar perfil');
     } catch (e) {
       throw Exception('Erro ao atualizar perfil: $e');
     }
@@ -506,10 +501,7 @@ class AuthService {
 
       return false;
     } on DioException catch (e) {
-      final message = e.response?.data is Map
-          ? e.response?.data['message']?.toString()
-          : null;
-      throw Exception(message ?? 'Erro ao enviar foto');
+      throw ApiException.from(e, fallback: 'Erro ao enviar foto');
     } catch (e) {
       throw Exception('Erro ao enviar foto: $e');
     }

@@ -6,6 +6,7 @@ import 'package:dio/dio.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../models/vehicle.dart';
 import '../../repositories/vehicle_repository.dart';
+import '../../services/api_error.dart';
 import '../../services/api_service.dart';
 import '../../widgets/vehicle_cover_avatar.dart';
 import '../../widgets/cover_framing.dart';
@@ -270,7 +271,7 @@ class _VehicleFormPageState extends State<VehicleFormPage> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Erro: ${e.toString()}'),
+            content: Text(apiErrorMessage(e)),
             backgroundColor: Colors.red,
           ),
         );

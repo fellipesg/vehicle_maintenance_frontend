@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import '../../models/workshop.dart';
+import '../../services/api_error.dart';
 import '../../services/api_service.dart';
 
 class WorkshopFormPage extends StatefulWidget {
@@ -222,7 +223,7 @@ class _WorkshopFormPageState extends State<WorkshopFormPage> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Erro: ${e.toString()}'),
+            content: Text(apiErrorMessage(e)),
             backgroundColor: Colors.red,
           ),
         );

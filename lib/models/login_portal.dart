@@ -55,21 +55,13 @@ extension LoginPortalX on LoginPortal {
   bool get showInHub =>
       this == LoginPortal.usuario || this == LoginPortal.lojista;
 
-  bool get canRegister =>
-      this == LoginPortal.usuario || this == LoginPortal.lojista;
+  /// Só proprietário. O backend aceita auto-cadastro apenas para `user`
+  /// ("Public registration is only available for vehicle owners"); contas de
+  /// lojista e de oficina são criadas pelo portal web.
+  bool get canRegister => this == LoginPortal.usuario;
 
   bool get supportsSocialLogin =>
       this == LoginPortal.usuario || this == LoginPortal.lojista;
 
-  String get registerUserType => switch (this) {
-        LoginPortal.lojista => 'garage',
-        LoginPortal.oficina => 'workshop',
-        LoginPortal.admin => 'user',
-        LoginPortal.usuario => 'user',
-      };
-
-  String get registerCta => switch (this) {
-        LoginPortal.lojista => 'Cadastre sua loja',
-        _ => 'Criar conta gratuita',
-      };
+  String get registerCta => 'Criar conta gratuita';
 }
