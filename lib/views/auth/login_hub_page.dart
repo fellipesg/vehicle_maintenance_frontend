@@ -56,7 +56,7 @@ class LoginHubPage extends StatelessWidget {
                 onPressed: () {
                   Navigator.of(context).push(
                     MaterialPageRoute(
-                      builder: (_) => const RegisterPage(userType: 'user'),
+                      builder: (_) => const RegisterPage(),
                     ),
                   );
                 },

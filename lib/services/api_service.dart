@@ -5,9 +5,29 @@ import 'package:flutter/foundation.dart';
 
 import '../models/vehicle_lookup_result.dart';
 
+/// Chamado quando o backend recusa o Bearer token (401) de uma rota autenticada.
+typedef UnauthorizedCallback = Future<void> Function();
+
 class ApiService {
   final Dio _dio;
   final String baseUrl;
+
+  /// Encerra a sessão quando o token expira, é revogado ou perde a validade
+  /// porque houve login em outro aparelho (o backend mantém um token `mobile`
+  /// por conta). Sem isso o app fica "logado" com um token morto.
+  UnauthorizedCallback? onUnauthorized;
+
+  bool _handlingUnauthorized = false;
+
+  /// Rotas em que 401 é a resposta normal para credencial errada — não é sessão
+  /// expirada, e `/logout` já está encerrando a sessão por conta própria.
+  static const Set<String> _unauthenticatedPaths = {
+    '/login',
+    '/register',
+    '/logout',
+    '/auth/',
+    '/two-factor/challenge',
+  };
 
   ApiService({required this.baseUrl})
       : _dio = Dio(BaseOptions(
@@ -25,6 +45,50 @@ class ApiService {
         responseBody: false,
         responseHeader: false,
       ));
+    }
+
+    _dio.interceptors.add(InterceptorsWrapper(
+      onError: (DioException error, ErrorInterceptorHandler handler) async {
+        if (_isExpiredSession(error)) {
+          await _notifyUnauthorized();
+        }
+
+        handler.next(error);
+      },
+    ));
+  }
+
+  bool _isExpiredSession(DioException error) {
+    if (error.response?.statusCode != 401) {
+      return false;
+    }
+
+    // Sem Authorization não havia sessão para expirar.
+    if (_dio.options.headers['Authorization'] == null) {
+      return false;
+    }
+
+    final path = error.requestOptions.path;
+
+    return !_unauthenticatedPaths.any(path.contains);
+  }
+
+  Future<void> _notifyUnauthorized() async {
+    final callback = onUnauthorized;
+
+    // Várias requisições em paralelo podem receber 401 juntas; só a primeira
+    // encerra a sessão. Depois disso o header já saiu e `_isExpiredSession`
+    // passa a devolver false.
+    if (callback == null || _handlingUnauthorized) {
+      return;
+    }
+
+    _handlingUnauthorized = true;
+
+    try {
+      await callback();
+    } finally {
+      _handlingUnauthorized = false;
     }
   }
 
@@ -241,7 +305,14 @@ class ApiService {
   }
 
   Future<Response> updateWorkshop(String id, FormData formData) async {
-    return await _dio.put(
+    // POST + `_method=PUT`: o PHP só popula $_POST/$_FILES em POST, então um PUT
+    // multipart chega ao Laravel sem campo nenhum — a validação é toda
+    // `sometimes`, passa, e a resposta é 200 sem ter salvo nada.
+    if (!formData.fields.any((field) => field.key == '_method')) {
+      formData.fields.add(const MapEntry('_method', 'PUT'));
+    }
+
+    return await _dio.post(
       '/workshops/$id',
       data: formData,
       options: Options(contentType: 'multipart/form-data'),

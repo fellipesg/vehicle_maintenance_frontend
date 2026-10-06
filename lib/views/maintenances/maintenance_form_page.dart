@@ -6,6 +6,7 @@ import '../../models/maintenance.dart';
 import '../../models/maintenance_item.dart';
 import '../../models/workshop.dart';
 import '../../models/warranty_template.dart';
+import '../../services/api_error.dart';
 import '../../services/api_service.dart';
 import '../../services/auth_service.dart';
 import 'maintenance_item_form_dialog.dart';
@@ -398,7 +399,7 @@ class _MaintenanceFormPageState extends State<MaintenanceFormPage> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Erro: ${e.toString()}'),
+            content: Text(apiErrorMessage(e)),
             backgroundColor: Colors.red,
           ),
         );

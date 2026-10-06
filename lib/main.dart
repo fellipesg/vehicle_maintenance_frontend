@@ -60,6 +60,8 @@ class _MyAppState extends State<MyApp> {
   late final AuthService _authService;
   late final VehicleRepository _vehicleRepository;
   late final NotificationInbox _notificationInbox;
+  final GlobalKey<ScaffoldMessengerState> _messengerKey =
+      GlobalKey<ScaffoldMessengerState>();
   bool _isLoading = true;
 
   @override
@@ -71,7 +73,33 @@ class _MyAppState extends State<MyApp> {
         _notificationInbox.refreshUnreadCount;
     _authService = AuthService(_apiService);
     _authService.vehicleRepository = _vehicleRepository;
+    _apiService.onUnauthorized = _handleSessionExpired;
     _initializeApp();
+  }
+
+  /// Token expirado ou revogado: volta para o hub de login em vez de deixar o
+  /// app "logado" errando em toda tela.
+  Future<void> _handleSessionExpired() async {
+    await _authService.handleUnauthorized();
+
+    if (!mounted) {
+      return;
+    }
+
+    // `home` troca para o LoginHubPage, mas as rotas empilhadas continuariam
+    // em cima dele.
+    NotificationNavigation.navigatorKey.currentState
+        ?.popUntil((route) => route.isFirst);
+
+    setState(() {});
+
+    _messengerKey.currentState
+      ?..hideCurrentSnackBar()
+      ..showSnackBar(
+        const SnackBar(
+          content: Text('Sua sessão expirou. Entre novamente.'),
+        ),
+      );
   }
 
   Future<void> _initializeApp() async {
@@ -123,6 +151,7 @@ class _MyAppState extends State<MyApp> {
             child: MaterialApp(
               key: const ValueKey('revisalog-app'),
               navigatorKey: NotificationNavigation.navigatorKey,
+              scaffoldMessengerKey: _messengerKey,
               title: 'Revisalog',
               debugShowCheckedModeBanner: false,
               theme: AppTheme.light,

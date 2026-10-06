@@ -3,10 +3,10 @@ import 'package:provider/provider.dart';
 import '../home_page.dart';
 import '../../services/auth_service.dart';
 
+/// Auto-cadastro é só de proprietário: o backend recusa `garage`/`workshop` e
+/// grava `user_type = 'user'` de qualquer forma.
 class RegisterPage extends StatefulWidget {
-  const RegisterPage({super.key, this.userType = 'user'});
-
-  final String userType;
+  const RegisterPage({super.key});
 
   @override
   State<RegisterPage> createState() => _RegisterPageState();
@@ -63,7 +63,6 @@ class _RegisterPageState extends State<RegisterPage> {
         name: _nameController.text.trim(),
         email: _emailController.text.trim(),
         password: _passwordController.text,
-        userType: widget.userType,
         phone: _phoneController.text.trim(),
         postalCode: _postalCodeController.text.trim(),
         street: _streetController.text.trim(),
@@ -119,18 +118,14 @@ class _RegisterPageState extends State<RegisterPage> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Text(
-                  widget.userType == 'garage'
-                      ? 'Cadastre sua loja'
-                      : 'Criar Conta',
+                  'Criar Conta',
                   style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                         fontWeight: FontWeight.bold,
                       ),
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  widget.userType == 'garage'
-                      ? 'Conta de lojista / garagem'
-                      : 'Conta de proprietário de veículo',
+                  'Conta de proprietário de veículo',
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                         color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
