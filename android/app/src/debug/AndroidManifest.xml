@@ -1,0 +1,11 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!--
+      A API local é servida em http (10.0.2.2:8080), e o Android bloqueia texto
+      claro por padrão desde o SDK 28 — o app compilava e falhava na conexão.
+
+      Fica só no manifest de debug: o de release continua sem a permissão, então
+      a build distribuída segue exigindo https.
+    -->
+    <application
+        android:usesCleartextTraffic="true" />
+</manifest>

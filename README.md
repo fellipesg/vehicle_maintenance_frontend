@@ -36,14 +36,14 @@ A base URL é definida via `--dart-define` (recomendado) ou pelo valor padrão e
 
 | Ambiente | URL sugerida |
 |----------|----------------|
-| Emulador Android | `http://10.0.2.2:8000/api/v1` |
-| Simulador iOS | `http://127.0.0.1:8000/api/v1` |
-| Device físico | `http://<IP-da-sua-máquina>:8000/api/v1` |
+| Emulador Android | `http://10.0.2.2:8080/api/v1` |
+| Simulador iOS | `http://127.0.0.1:8080/api/v1` |
+| Device físico | `http://<IP-da-sua-máquina>:8080/api/v1` |
 | Túnel (ngrok/cloudflare) | `https://<seu-host>/api/v1` |
 | Produção | `https://revisalog.com.br/api/v1` |
 
 ```bash
-flutter run --dart-define=API_BASE_URL=http://10.0.2.2:8081/api/v1
+flutter run --dart-define=API_BASE_URL=http://10.0.2.2:8080/api/v1
 
 # Produção
 flutter run --dart-define=API_BASE_URL=https://revisalog.com.br/api/v1

@@ -336,13 +336,6 @@ class AuthService {
     }
   }
 
-  Future<bool> loginWithSSO(String provider) async {
-    // This method is kept for backward compatibility
-    // The actual OAuth flow is handled by opening the URL in native browser
-    final redirectUrl = await getOAuthRedirectUrl(provider);
-    return redirectUrl != null;
-  }
-
   Future<LoginResult> processOAuthCallback(
       String provider, Map<String, String> queryParams) async {
     try {

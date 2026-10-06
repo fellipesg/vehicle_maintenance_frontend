@@ -28,4 +28,17 @@ void main() {
       isFalse,
     );
   });
+
+  test('cleartext http is allowed in debug only', () {
+    final debugManifest =
+        File('android/app/src/debug/AndroidManifest.xml').readAsStringSync();
+    final mainManifest =
+        File('android/app/src/main/AndroidManifest.xml').readAsStringSync();
+
+    // A API local é http; sem isso o debug não conecta no emulador.
+    expect(debugManifest, contains('android:usesCleartextTraffic="true"'));
+
+    // E o release não pode herdar a permissão.
+    expect(mainManifest, isNot(contains('usesCleartextTraffic')));
+  });
 }
