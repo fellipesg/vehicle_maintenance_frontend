@@ -4,6 +4,8 @@ import 'package:provider/provider.dart';
 import '../../services/auth_service.dart';
 import '../../theme/theme_controller.dart';
 import '../auth/login_hub_page.dart';
+import 'change_password_page.dart';
+import 'two_factor_page.dart';
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
@@ -114,25 +116,6 @@ class _SettingsPageState extends State<SettingsPage> {
     }
   }
 
-  void _showTwoFactorInfo(BuildContext context) {
-    showDialog<void>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Autenticação em duas etapas'),
-        content: const Text(
-          'Quando a verificação em duas etapas estiver ativa na sua conta, '
-          'o app solicitará um código após o login. A configuração da 2FA '
-          'será feita pelo servidor em uma versão futura.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Entendi'),
-          ),
-        ],
-      ),
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -181,18 +164,45 @@ class _SettingsPageState extends State<SettingsPage> {
           Card(
             child: Column(
               children: [
-                const ListTile(
-                  leading: Icon(Icons.lock_outline),
-                  title: Text('Alterar senha'),
-                  subtitle: Text('Em breve'),
-                  enabled: false,
+                ListTile(
+                  key: const Key('settings_change_password'),
+                  leading: const Icon(Icons.lock_outline),
+                  title: const Text('Alterar senha'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: _isDeletingAccount
+                      ? null
+                      : () => Navigator.of(context).push(
+                            MaterialPageRoute<void>(
+                              builder: (_) => const ChangePasswordPage(),
+                            ),
+                          ),
                 ),
                 const Divider(height: 1),
                 ListTile(
+                  key: const Key('settings_two_factor'),
                   leading: const Icon(Icons.security),
-                  title: const Text('Autenticação em duas etapas'),
+                  title: const Text('Verificação em duas etapas'),
+                  // listen: false porque o AuthService não é ChangeNotifier; o
+                  // estado é relido no setState de volta da TwoFactorPage.
+                  subtitle: Text(
+                    Provider.of<AuthService>(context, listen: false)
+                            .hasTwoFactorEnabled
+                        ? 'Ativa'
+                        : 'Desativada',
+                  ),
                   trailing: const Icon(Icons.chevron_right),
-                  onTap: () => _showTwoFactorInfo(context),
+                  onTap: _isDeletingAccount
+                      ? null
+                      : () async {
+                          await Navigator.of(context).push(
+                            MaterialPageRoute<void>(
+                              builder: (_) => const TwoFactorPage(),
+                            ),
+                          );
+                          if (mounted) {
+                            setState(() {});
+                          }
+                        },
                 ),
                 const Divider(height: 1),
                 ListTile(

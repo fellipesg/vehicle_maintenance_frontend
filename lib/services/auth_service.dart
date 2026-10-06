@@ -41,6 +41,8 @@ class AuthService {
 
   bool get isAdmin => user?['is_admin'] == true;
 
+  bool get hasTwoFactorEnabled => user?['has_two_factor_enabled'] == true;
+
   int? get workshopId {
     final value = user?['workshop_id'];
     if (value is int) {

@@ -10,6 +10,7 @@ import '../../models/login_result.dart';
 import '../../services/apple_sign_in.dart';
 import '../../services/google_sign_in.dart';
 import '../../services/auth_service.dart';
+import 'forgot_password_page.dart';
 import 'oauth_webview_page.dart';
 import 'register_page.dart';
 import 'two_factor_challenge_page.dart';
@@ -452,6 +453,19 @@ class _LoginPageState extends State<LoginPage> {
                           ),
                         )
                       : const Text('Entrar'),
+                ),
+                TextButton(
+                  key: const Key('login_forgot_password'),
+                  onPressed: _isLoading
+                      ? null
+                      : () => Navigator.of(context).push(
+                            MaterialPageRoute<void>(
+                              builder: (_) => ForgotPasswordPage(
+                                initialEmail: _emailController.text.trim(),
+                              ),
+                            ),
+                          ),
+                  child: const Text('Esqueci minha senha'),
                 ),
                 if (_portal.supportsSocialLogin) ...[
                   const SizedBox(height: 24),
