@@ -51,7 +51,9 @@ dependencies:
   cached_network_image: ^3.4.1
   sign_in_with_apple: ^7.0.1
   crypto: ^3.0.7
-  google_sign_in: ^7.2.0
+  google_sign_in: ^6.3.0
+  # 5.8.1 é a última com GoogleSignIn 7.1 (GoogleUtilities 7), compatível com o Firebase 10.
+  google_sign_in_ios: 5.8.1
 
 dev_dependencies:
   flutter_test:

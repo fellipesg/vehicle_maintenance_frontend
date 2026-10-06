@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/services.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
 /// Clientes OAuth do projeto Firebase vehicle-maintenance-a9e32. Não são segredos: o backend
@@ -12,30 +13,32 @@ const googleIosClientId =
 /// Devolve o ID token do Google, ou null se a pessoa cancelar.
 typedef GoogleIdTokenLoader = Future<String?> Function();
 
-bool _googleSignInInitialized = false;
+/// google_sign_in fica na 6.x: a 7.x exige GoogleSignIn 8+ no iOS, incompatível com o Firebase 10.
+final _googleSignIn = GoogleSignIn(
+  clientId: Platform.isIOS ? googleIosClientId : null,
+  serverClientId: googleWebClientId,
+  scopes: const ['email'],
+);
 
 Future<String?> loadGoogleIdToken() async {
-  final signIn = GoogleSignIn.instance;
-
-  if (!_googleSignInInitialized) {
-    await signIn.initialize(
-      clientId: Platform.isIOS ? googleIosClientId : null,
-      serverClientId: googleWebClientId,
-    );
-    _googleSignInInitialized = true;
-  }
-
   try {
-    final account = await signIn.authenticate(scopeHint: const ['email']);
-    final idToken = account.authentication.idToken;
+    // Sai da sessão anterior para a pessoa sempre poder escolher a conta.
+    await _googleSignIn.signOut();
+    final account = await _googleSignIn.signIn();
+
+    if (account == null) {
+      return null;
+    }
+
+    final idToken = (await account.authentication).idToken;
 
     if (idToken == null || idToken.isEmpty) {
       throw Exception('Unable to authenticate with Google.');
     }
 
     return idToken;
-  } on GoogleSignInException catch (error) {
-    if (error.code == GoogleSignInExceptionCode.canceled) {
+  } on PlatformException catch (error) {
+    if (error.code == GoogleSignIn.kSignInCanceledError) {
       return null;
     }
 
