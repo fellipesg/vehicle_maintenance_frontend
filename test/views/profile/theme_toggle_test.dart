@@ -2,9 +2,41 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:vehicle_maintenance/services/api_service.dart';
+import 'package:vehicle_maintenance/services/auth_service.dart';
+import 'package:vehicle_maintenance/services/auth_token_storage.dart';
+import 'package:vehicle_maintenance/services/fcm_service.dart';
 import 'package:vehicle_maintenance/theme/app_theme.dart';
 import 'package:vehicle_maintenance/theme/theme_controller.dart';
 import 'package:vehicle_maintenance/views/profile/settings_page.dart';
+
+class _FakeAuthTokenStorage implements AuthTokenStorage {
+  @override
+  Future<void> deleteToken() async {}
+
+  @override
+  Future<String?> readToken() async => null;
+
+  @override
+  Future<void> writeToken(String value) async {}
+}
+
+class _FakeFcmService extends Fake implements FcmService {
+  @override
+  Future<void> removeToken() async {}
+
+  @override
+  Future<void> registerTokenAfterAuth() async {}
+}
+
+/// A tela de Configurações lê o AuthService no build (estado da 2FA).
+AuthService _buildAuthService() {
+  return AuthService(
+    ApiService(baseUrl: 'http://test'),
+    tokenStorage: _FakeAuthTokenStorage(),
+    fcmService: _FakeFcmService(),
+  );
+}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -18,8 +50,11 @@ void main() {
     final controller = ThemeController(initialMode: ThemeMode.light);
 
     await tester.pumpWidget(
-      ChangeNotifierProvider<ThemeController>.value(
-        value: controller,
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider<ThemeController>.value(value: controller),
+          Provider<AuthService>.value(value: _buildAuthService()),
+        ],
         child: Consumer<ThemeController>(
           builder: (context, theme, _) {
             return MaterialApp(

@@ -346,6 +346,62 @@ class ApiService {
     return await _dio.delete('/me');
   }
 
+  // Password endpoints
+
+  /// Pede o link de redefinição. A resposta é a mesma exista ou não a conta, de
+  /// propósito, para não revelar quais e-mails estão cadastrados.
+  Future<Response> requestPasswordReset(String email) async {
+    return await _dio.post('/password/forgot', data: {'email': email});
+  }
+
+  /// Troca a senha do usuário logado. Derruba os outros aparelhos no servidor;
+  /// o token deste segue valendo.
+  Future<Response> changePassword({
+    required String currentPassword,
+    required String password,
+  }) async {
+    return await _dio.put(
+      '/me/password',
+      data: {
+        'current_password': currentPassword,
+        'password': password,
+        'password_confirmation': password,
+      },
+    );
+  }
+
+  // Two-factor endpoints
+
+  /// Primeiro passo: devolve `secret` e `otpauth_uri` para cadastrar no
+  /// autenticador. A 2FA só passa a valer depois do confirm.
+  Future<Response> enableTwoFactor() async {
+    return await _dio.post('/two-factor/enable');
+  }
+
+  Future<Response> confirmTwoFactor(String code) async {
+    return await _dio.post('/two-factor/confirm', data: {'code': code});
+  }
+
+  Future<Response> disableTwoFactor({
+    required String password,
+    required String code,
+  }) async {
+    return await _dio.post(
+      '/two-factor/disable',
+      data: {'password': password, 'code': code},
+    );
+  }
+
+  Future<Response> regenerateTwoFactorRecoveryCodes({
+    required String password,
+    required String code,
+  }) async {
+    return await _dio.post(
+      '/two-factor/recovery-codes',
+      data: {'password': password, 'code': code},
+    );
+  }
+
   Future<Response> uploadAvatar(File file) async {
     final formData = FormData.fromMap({
       'avatar': await MultipartFile.fromFile(
