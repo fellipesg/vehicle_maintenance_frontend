@@ -9,6 +9,7 @@ import '../../repositories/vehicle_repository.dart';
 import '../../services/api_error.dart';
 import '../../services/api_service.dart';
 import '../../widgets/vehicle_cover_avatar.dart';
+import '../../widgets/catalog_autocomplete.dart';
 import '../../widgets/cover_framing.dart';
 import '../../widgets/cover_image_cropper.dart';
 import '../../widgets/terms_scroll_acceptance.dart';
@@ -45,9 +46,22 @@ class _VehicleFormPageState extends State<VehicleFormPage> {
   String? _existingLandscapeUrl;
   String? _existingPortraitUrl;
 
+  final _brandFocusNode = FocusNode();
+  final _modelFocusNode = FocusNode();
+
+  /// Sugestões do catálogo. Vazias enquanto carregam ou se a requisição falhar:
+  /// os campos continuam aceitando texto livre, porque o catálogo não cobre
+  /// todo modelo novo ou importado e o backend aceita qualquer string.
+  List<String> _catalogBrands = const [];
+  List<String> _catalogModels = const [];
+
+  /// Marca cujos modelos já estão em `_catalogModels`, para não repetir a busca.
+  String? _modelsLoadedForBrand;
+
   @override
   void initState() {
     super.initState();
+    _loadCatalogBrands();
     if (widget.vehicle != null) {
       _licensePlateController.text = widget.vehicle!.licensePlate;
       _renavamController.text = widget.vehicle!.renavam ?? '';
@@ -66,6 +80,61 @@ class _VehicleFormPageState extends State<VehicleFormPage> {
     } else {
       _loadTerms();
     }
+
+    // Editando: já há marca, então os modelos dela podem vir junto.
+    if (_brandController.text.trim().isNotEmpty) {
+      _loadCatalogModels(_brandController.text.trim());
+    }
+  }
+
+  /// Falha silenciosa de propósito: sem sugestões o formulário ainda funciona, e
+  /// um erro aqui não deve atrapalhar quem está cadastrando.
+  Future<void> _loadCatalogBrands() async {
+    try {
+      final apiService = Provider.of<ApiService>(context, listen: false);
+      final brands = await apiService.getCatalogBrands();
+
+      if (mounted) {
+        setState(() => _catalogBrands = brands);
+      }
+    } catch (_) {
+      // Sem catálogo: marca e modelo seguem como texto livre.
+    }
+  }
+
+  Future<void> _loadCatalogModels(String brand) async {
+    if (brand.isEmpty || _modelsLoadedForBrand == brand) {
+      return;
+    }
+
+    _modelsLoadedForBrand = brand;
+
+    try {
+      final apiService = Provider.of<ApiService>(context, listen: false);
+      final models = await apiService.getCatalogModels(brand);
+
+      if (mounted) {
+        setState(() => _catalogModels = models);
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _catalogModels = const []);
+      }
+    }
+  }
+
+  /// Chamado quando a marca é escolhida na lista: o nome vem canônico, que é o
+  /// que o endpoint de modelos espera (ele resolve por chave exata).
+  void _onBrandSelected(String brand) {
+    final previous = _modelsLoadedForBrand;
+
+    if (previous != null && previous != brand) {
+      // Trocou de marca: os modelos da anterior não servem mais. O texto já
+      // digitado no campo fica, para não apagar o que a pessoa escreveu.
+      setState(() => _catalogModels = const []);
+    }
+
+    _loadCatalogModels(brand);
   }
 
   Future<void> _loadTerms() async {
@@ -131,6 +200,8 @@ class _VehicleFormPageState extends State<VehicleFormPage> {
   void dispose() {
     _licensePlateController.dispose();
     _renavamController.dispose();
+    _brandFocusNode.dispose();
+    _modelFocusNode.dispose();
     _brandController.dispose();
     _modelController.dispose();
     _yearController.dispose();
@@ -464,8 +535,12 @@ class _VehicleFormPageState extends State<VehicleFormPage> {
                   children: [
                     Expanded(
                       flex: 2,
-                      child: TextFormField(
+                      child: CatalogAutocomplete(
+                        key: const Key('vehicle_brand_field'),
                         controller: _brandController,
+                        focusNode: _brandFocusNode,
+                        options: _catalogBrands,
+                        onSelected: _onBrandSelected,
                         decoration: const InputDecoration(
                           labelText: 'Marca *',
                           prefixIcon: Icon(Icons.directions_car),
@@ -482,8 +557,11 @@ class _VehicleFormPageState extends State<VehicleFormPage> {
                     const SizedBox(width: 12),
                     Expanded(
                       flex: 3,
-                      child: TextFormField(
+                      child: CatalogAutocomplete(
+                        key: const Key('vehicle_model_field'),
                         controller: _modelController,
+                        focusNode: _modelFocusNode,
+                        options: _catalogModels,
                         decoration: const InputDecoration(
                           labelText: 'Modelo *',
                           border: OutlineInputBorder(),

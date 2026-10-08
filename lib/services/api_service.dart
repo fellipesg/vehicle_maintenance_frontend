@@ -142,6 +142,43 @@ class ApiService {
     return await _dio.get('/vehicles', queryParameters: queryParams);
   }
 
+  // Vehicle catalog (sugestões de marca e modelo)
+
+  /// Marcas ativas do catálogo. O backend devolve uma lista de strings.
+  Future<List<String>> getCatalogBrands() async {
+    final response = await _dio.get('/vehicle-catalog/brands');
+
+    return _stringList(response.data);
+  }
+
+  /// Modelos de uma marca. O backend resolve por chave exata, então `brand`
+  /// precisa ser o nome como está no catálogo — daí passarmos o valor
+  /// selecionado, não o que o usuário digitou.
+  Future<List<String>> getCatalogModels(String brand) async {
+    final response = await _dio.get(
+      '/vehicle-catalog/models',
+      queryParameters: {'brand': brand},
+    );
+
+    return _stringList(response.data);
+  }
+
+  static List<String> _stringList(dynamic envelope) {
+    if (envelope is! Map) {
+      return const [];
+    }
+
+    final data = envelope['data'];
+    if (data is! List) {
+      return const [];
+    }
+
+    return data
+        .map((item) => item.toString())
+        .where((item) => item.isNotEmpty)
+        .toList();
+  }
+
   Future<Response> getVehicle(String id) async {
     return await _dio.get('/vehicles/$id');
   }
