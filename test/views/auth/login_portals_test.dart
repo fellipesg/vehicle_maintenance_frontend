@@ -11,6 +11,7 @@ import 'package:vehicle_maintenance/services/auth_service.dart';
 import 'package:vehicle_maintenance/services/auth_token_storage.dart';
 import 'package:vehicle_maintenance/services/fcm_service.dart';
 import 'package:vehicle_maintenance/services/notification_inbox.dart';
+import 'package:vehicle_maintenance/services/workshop_records_inbox.dart';
 import 'package:vehicle_maintenance/views/auth/login_hub_page.dart';
 import 'package:vehicle_maintenance/views/auth/login_page.dart';
 import 'package:vehicle_maintenance/views/home_page.dart';
@@ -141,6 +142,9 @@ Widget buildLoginTestApp({
       ),
       ChangeNotifierProvider<NotificationInbox>(
         create: (_) => NotificationInbox(resolvedApi),
+      ),
+      ChangeNotifierProvider<WorkshopRecordsInbox>(
+        create: (_) => WorkshopRecordsInbox(resolvedApi),
       ),
     ],
     child: MaterialApp(home: home),

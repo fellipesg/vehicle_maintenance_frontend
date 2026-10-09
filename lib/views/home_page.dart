@@ -10,11 +10,14 @@ import '../../widgets/vehicle_identity.dart';
 import 'auth/login_hub_page.dart';
 import 'notifications/notifications_page.dart';
 import '../services/notification_inbox.dart';
+import '../services/workshop_records_inbox.dart';
+import '../widgets/workshop_records/pending_workshop_records_card.dart';
 import 'profile/profile_edit_page.dart';
 import 'profile/settings_page.dart';
 import 'vehicles/vehicle_form_page.dart';
 import 'vehicles/vehicle_link_page.dart';
 import 'vehicles/vehicle_detail_page.dart';
+import 'workshop_vehicles/workshop_chassis_page.dart';
 import '../widgets/load_more_button.dart';
 
 class HomePage extends StatefulWidget {
@@ -39,8 +42,22 @@ class _HomePageState extends State<HomePage> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         context.read<NotificationInbox>().refreshUnreadCount();
+        _refreshWorkshopRecords();
       }
     });
+  }
+
+  /// Oficina e admin não decidem registros; zera o contador para não sobrar o
+  /// valor de uma sessão anterior.
+  void _refreshWorkshopRecords() {
+    final auth = context.read<AuthService>();
+    final inbox = context.read<WorkshopRecordsInbox>();
+
+    if (auth.isWorkshopUser || auth.isAdmin) {
+      inbox.clear();
+    } else {
+      inbox.refresh();
+    }
   }
 
   bool _onScrollNotification(ScrollNotification notification) {
@@ -147,6 +164,26 @@ class _VehiclesPageState extends State<VehiclesPage> {
     );
   }
 
+  /// Oficina registrando OS em carro que ainda não está no RevisaLog: entra pelo
+  /// chassi, sem dados do dono.
+  Widget _chassisFlowButton(BuildContext context) {
+    return TextButton.icon(
+      key: const Key('workshop_chassis_entry'),
+      onPressed: () async {
+        final result = await Navigator.of(context).push(
+          MaterialPageRoute<bool>(
+            builder: (_) => const WorkshopChassisPage(),
+          ),
+        );
+        if (result == true && context.mounted) {
+          await context.read<VehicleRepository>().invalidate();
+        }
+      },
+      icon: const Icon(Icons.qr_code_2),
+      label: const Text('Carro ainda não está no RevisaLog'),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Consumer<VehicleRepository>(
@@ -172,61 +209,73 @@ class _VehiclesPageState extends State<VehiclesPage> {
     VehicleRepository repository,
     List<Vehicle> vehicles,
   ) {
-    final isAdmin = context.watch<AuthService>().isAdmin;
+    final auth = context.watch<AuthService>();
+    final isAdmin = auth.isAdmin;
+    final isWorkshop = auth.isWorkshopUser;
+    final showRecordsCard = !isAdmin && !isWorkshop;
 
     if (vehicles.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.directions_car_outlined,
-              size: 64,
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-            ),
-            const SizedBox(height: 16),
-            Text(
-              isAdmin
-                  ? 'Nenhum veículo na plataforma'
-                  : 'Nenhum veículo cadastrado',
-              style: Theme.of(context).textTheme.headlineSmall,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              isAdmin
-                  ? 'Quando houver cadastros, eles aparecerão aqui'
-                  : 'Adicione um veículo para começar',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+      return Column(
+        children: [
+          if (showRecordsCard) const PendingWorkshopRecordsCard(),
+          Expanded(
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.directions_car_outlined,
+                    size: 64,
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
-            ),
-            if (!isAdmin) ...[
-              const SizedBox(height: 24),
-              ElevatedButton.icon(
-                onPressed: () async {
-                  final result = await Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => const VehicleFormPage(),
+                  const SizedBox(height: 16),
+                  Text(
+                    isAdmin
+                        ? 'Nenhum veículo na plataforma'
+                        : 'Nenhum veículo cadastrado',
+                    style: Theme.of(context).textTheme.headlineSmall,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    isAdmin
+                        ? 'Quando houver cadastros, eles aparecerão aqui'
+                        : 'Adicione um veículo para começar',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                  ),
+                  if (!isAdmin) ...[
+                    const SizedBox(height: 24),
+                    ElevatedButton.icon(
+                      onPressed: () async {
+                        final result = await Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => const VehicleFormPage(),
+                          ),
+                        );
+                        if (result == true) {
+                          await context.read<VehicleRepository>().invalidate();
+                        }
+                      },
+                      icon: const Icon(Icons.add),
+                      label: const Text('Adicionar Veículo'),
                     ),
-                  );
-                  if (result == true) {
-                    await context.read<VehicleRepository>().invalidate();
-                  }
-                },
-                icon: const Icon(Icons.add),
-                label: const Text('Adicionar Veículo'),
+                    const SizedBox(height: 8),
+                    _linkVehicleButton(context),
+                    if (isWorkshop) _chassisFlowButton(context),
+                  ],
+                ],
               ),
-              const SizedBox(height: 8),
-              _linkVehicleButton(context),
-            ],
-          ],
-        ),
+            ),
+          ),
+        ],
       );
     }
 
     return Scaffold(
       body: Column(
         children: [
+          if (showRecordsCard) const PendingWorkshopRecordsCard(),
           if (isAdmin)
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
@@ -263,7 +312,12 @@ class _VehiclesPageState extends State<VehiclesPage> {
                   if (index >= vehicles.length) {
                     return Padding(
                       padding: const EdgeInsets.only(top: 8, bottom: 24),
-                      child: _linkVehicleButton(context),
+                      child: Column(
+                        children: [
+                          _linkVehicleButton(context),
+                          if (isWorkshop) _chassisFlowButton(context),
+                        ],
+                      ),
                     );
                   }
 

@@ -14,6 +14,7 @@ import 'repositories/vehicle_repository.dart';
 import 'services/api_service.dart';
 import 'services/auth_service.dart';
 import 'services/notification_inbox.dart';
+import 'services/workshop_records_inbox.dart';
 import 'theme/app_theme.dart';
 import 'theme/theme_controller.dart';
 
@@ -60,6 +61,7 @@ class _MyAppState extends State<MyApp> {
   late final AuthService _authService;
   late final VehicleRepository _vehicleRepository;
   late final NotificationInbox _notificationInbox;
+  late final WorkshopRecordsInbox _workshopRecordsInbox;
   final GlobalKey<ScaffoldMessengerState> _messengerKey =
       GlobalKey<ScaffoldMessengerState>();
   bool _isLoading = true;
@@ -69,6 +71,7 @@ class _MyAppState extends State<MyApp> {
     super.initState();
     _vehicleRepository = VehicleRepository(_apiService);
     _notificationInbox = NotificationInbox(_apiService);
+    _workshopRecordsInbox = WorkshopRecordsInbox(_apiService);
     PushNotificationSetup.onPushReceived =
         _notificationInbox.refreshUnreadCount;
     _authService = AuthService(_apiService);
@@ -146,6 +149,9 @@ class _MyAppState extends State<MyApp> {
               ),
               ChangeNotifierProvider<NotificationInbox>.value(
                 value: _notificationInbox,
+              ),
+              ChangeNotifierProvider<WorkshopRecordsInbox>.value(
+                value: _workshopRecordsInbox,
               ),
             ],
             child: MaterialApp(

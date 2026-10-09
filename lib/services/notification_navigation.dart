@@ -6,9 +6,10 @@ import 'package:flutter/material.dart';
 import '../views/maintenances/maintenance_detail_page.dart';
 import '../views/notifications/notifications_page.dart';
 import '../views/vehicles/vehicle_detail_page.dart';
+import '../views/workshop_records/workshop_records_page.dart';
 
 /// Para onde um push (ou um item da lista de notificações) leva.
-enum NotificationTarget { maintenance, vehicle, inbox }
+enum NotificationTarget { maintenance, vehicle, workshopRecords, inbox }
 
 class NotificationNavigation {
   static final GlobalKey<NavigatorState> navigatorKey =
@@ -16,6 +17,10 @@ class NotificationNavigation {
 
   /// Tipos que abrem a manutenção citada (resposta da oficina à validação).
   static const Set<String> maintenanceTypes = {'workshop-review-decided'};
+
+  /// Carro com registros de oficina esperando decisão do proprietário. O payload
+  /// traz `vehicle_id`, mas o destino é a lista de registros, não o carro.
+  static const String workshopRecordsPendingType = 'workshop_records_pending';
 
   static int? vehicleIdFromPayload(Map<String, dynamic> data) {
     return _toInt(data['vehicle_id']);
@@ -27,6 +32,10 @@ class NotificationNavigation {
 
   static NotificationTarget targetFor(Map<String, dynamic> data) {
     final type = data['type']?.toString();
+
+    if (type == workshopRecordsPendingType) {
+      return NotificationTarget.workshopRecords;
+    }
 
     if (maintenanceTypes.contains(type) &&
         maintenanceIdFromPayload(data) != null) {
@@ -77,6 +86,10 @@ class NotificationNavigation {
         ));
       case NotificationTarget.vehicle:
         openVehicle(vehicleIdFromPayload(data)!);
+      case NotificationTarget.workshopRecords:
+        navigator.push(MaterialPageRoute<void>(
+          builder: (context) => const WorkshopRecordsPage(),
+        ));
       case NotificationTarget.inbox:
         navigator.push(MaterialPageRoute<void>(
           builder: (context) => const NotificationsPage(),

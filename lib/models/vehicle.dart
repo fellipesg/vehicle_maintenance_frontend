@@ -3,7 +3,7 @@ import 'vehicle_plate.dart';
 
 class Vehicle {
   final int? id;
-  final String licensePlate;
+  final String? licensePlate;
   final String? currentPlate;
   final String? renavam;
   final String brand;
@@ -24,7 +24,7 @@ class Vehicle {
 
   Vehicle({
     this.id,
-    required this.licensePlate,
+    this.licensePlate,
     this.currentPlate,
     this.renavam,
     required this.brand,
@@ -50,9 +50,9 @@ class Vehicle {
 
     return Vehicle(
       id: json['id'] as int?,
-      licensePlate: json['license_plate']?.toString() ?? '',
-      currentPlate: json['current_plate']?.toString() ??
-          json['license_plate']?.toString(),
+      licensePlate: _nonEmpty(json['license_plate']),
+      currentPlate:
+          _nonEmpty(json['current_plate']) ?? _nonEmpty(json['license_plate']),
       renavam: json['renavam']?.toString(),
       brand: json['brand']?.toString() ?? '',
       model: json['model']?.toString() ?? '',
@@ -84,6 +84,12 @@ class Vehicle {
           : null,
       maintenances: json['maintenances'],
     );
+  }
+
+  static String? _nonEmpty(dynamic value) {
+    final text = value?.toString().trim();
+
+    return (text == null || text.isEmpty) ? null : text;
   }
 
   static int? _parseInt(dynamic value) {
@@ -125,6 +131,16 @@ class Vehicle {
   }
 
   String get displayName => '$brand $model';
-  String get fullInfo => '$displayName ($year) - $licensePlate';
-  String get displayPlate => currentPlate ?? licensePlate;
+  String get fullInfo => '$displayName ($year) - $plateLabel';
+
+  /// Placa em uso, ou vazio quando o carro não tem placa cadastrada (veículo
+  /// criado por oficina pelo chassi, ainda sem dono).
+  String get displayPlate => currentPlate ?? licensePlate ?? '';
+
+  bool get hasPlate => displayPlate.isNotEmpty;
+
+  /// Texto para mostrar ao usuário no lugar da placa.
+  String get plateLabel => hasPlate ? displayPlate : noPlateLabel;
+
+  static const String noPlateLabel = 'Placa não informada';
 }

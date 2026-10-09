@@ -65,11 +65,14 @@ class VehicleIdentity extends StatelessWidget {
             side: BorderSide(color: Colors.amber.shade300),
           ),
         const SizedBox(height: 8),
-        if (vehicle.displayPlate.isNotEmpty)
-          Chip(
-            label: Text('Placa atual ${vehicle.displayPlate}'),
-            visualDensity: VisualDensity.compact,
+        Chip(
+          label: Text(
+            vehicle.hasPlate
+                ? 'Placa atual ${vehicle.displayPlate}'
+                : Vehicle.noPlateLabel,
           ),
+          visualDensity: VisualDensity.compact,
+        ),
       ],
     );
   }

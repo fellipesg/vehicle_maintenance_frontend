@@ -65,7 +65,7 @@ class _VehicleFormPageState extends State<VehicleFormPage> {
     super.initState();
     _loadCatalogBrands();
     if (widget.vehicle != null) {
-      _licensePlateController.text = widget.vehicle!.licensePlate;
+      _licensePlateController.text = widget.vehicle!.licensePlate ?? '';
       _renavamController.text = widget.vehicle!.renavam ?? '';
       _brandController.text = widget.vehicle!.brand;
       _modelController.text = widget.vehicle!.model;
@@ -262,14 +262,20 @@ class _VehicleFormPageState extends State<VehicleFormPage> {
     return null;
   }
 
+  /// Carro criado por oficina não tinha placa: informá-la agora não é troca.
+  bool _plateChanged(String newPlate) {
+    final current = widget.vehicle?.licensePlate?.toUpperCase() ?? '';
+
+    return widget.vehicle != null && current.isNotEmpty && newPlate != current;
+  }
+
   Future<void> _handleSubmit() async {
     if (!_formKey.currentState!.validate()) {
       return;
     }
 
     final newPlate = _licensePlateController.text.trim().toUpperCase();
-    if (widget.vehicle != null &&
-        newPlate != widget.vehicle!.licensePlate.toUpperCase()) {
+    if (_plateChanged(newPlate)) {
       final registerChange = await showDialog<bool>(
         context: context,
         builder: (context) => AlertDialog(
@@ -334,7 +340,7 @@ class _VehicleFormPageState extends State<VehicleFormPage> {
 
       if (widget.vehicle != null) {
         vehicleId = widget.vehicle!.id.toString();
-        if (newPlate != widget.vehicle!.licensePlate.toUpperCase()) {
+        if (_plateChanged(newPlate)) {
           vehicleData['plate_changed_at'] =
               DateTime.now().toUtc().toIso8601String();
         }

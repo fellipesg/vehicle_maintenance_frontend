@@ -17,6 +17,7 @@ import '../../services/auth_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/provenance/provenance_seal.dart';
 import '../../widgets/vehicle_cover_avatar.dart';
+import '../../widgets/workshop_records/customer_invite_card.dart';
 import 'maintenance_form_page.dart';
 
 class MaintenanceDetailPage extends StatefulWidget {
@@ -226,6 +227,14 @@ class _MaintenanceDetailPageState extends State<MaintenanceDetailPage> {
                 delegate: SliverChildListDelegate([
                   ProvenanceSeal(maintenance: _maintenance!),
                   const SizedBox(height: 16),
+                  if (_isWorkshopPortal && _maintenance!.isAwaitingOwner) ...[
+                    CustomerInviteCard(
+                      maintenanceId: _maintenance!.id!,
+                      whatsappInvitedAt: _maintenance!.whatsappInvitedAt,
+                      emailInvitedAt: _maintenance!.emailInvitedAt,
+                    ),
+                    const SizedBox(height: 16),
+                  ],
                   Card(
                     child: Padding(
                       padding: const EdgeInsets.all(16),

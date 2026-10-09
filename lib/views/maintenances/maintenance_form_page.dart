@@ -11,15 +11,22 @@ import '../../services/api_service.dart';
 import '../../services/auth_service.dart';
 import 'maintenance_item_form_dialog.dart';
 import '../workshops/workshop_search_page.dart';
+import '../workshop_vehicles/workshop_chassis_page.dart'
+    show kNoPersonalDataHelper;
 
 class MaintenanceFormPage extends StatefulWidget {
   final int vehicleId;
   final Maintenance? maintenance;
 
+  /// OS em carro sem dono (criado pela oficina pelo chassi): mostra o aviso de
+  /// anexos pendentes e o lembrete de não incluir dados do cliente.
+  final bool isOwnerlessVehicle;
+
   const MaintenanceFormPage({
     super.key,
     required this.vehicleId,
     this.maintenance,
+    this.isOwnerlessVehicle = false,
   });
 
   @override
@@ -89,6 +96,11 @@ class _MaintenanceFormPageState extends State<MaintenanceFormPage> {
     final auth = Provider.of<AuthService>(context, listen: false);
     return auth.isWorkshopUser;
   }
+
+  bool get _isOwnerless =>
+      _isWorkshopPortal &&
+      (widget.isOwnerlessVehicle ||
+          (widget.maintenance?.isOwnerlessRecord ?? false));
 
   String get _entityLabel => _isWorkshopPortal ? 'OS' : 'Manutenção';
 
@@ -219,6 +231,7 @@ class _MaintenanceFormPageState extends State<MaintenanceFormPage> {
       builder: (_) => MaintenanceItemFormDialog(
         showWarrantyTemplates: _isWorkshopPortal,
         itemWarrantyTemplates: _itemWarrantyTemplates,
+        descriptionHelper: _isOwnerless ? kNoPersonalDataHelper : null,
       ),
     );
 
@@ -234,6 +247,7 @@ class _MaintenanceFormPageState extends State<MaintenanceFormPage> {
       context: context,
       builder: (_) => MaintenanceItemFormDialog(
         item: _items[index],
+        descriptionHelper: _isOwnerless ? kNoPersonalDataHelper : null,
         showWarrantyTemplates: _isWorkshopPortal,
         itemWarrantyTemplates: _itemWarrantyTemplates,
       ),
@@ -589,10 +603,12 @@ class _MaintenanceFormPageState extends State<MaintenanceFormPage> {
                 const SizedBox(height: 16),
                 TextFormField(
                   controller: _descriptionController,
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     labelText: 'Descrição',
-                    prefixIcon: Icon(Icons.description),
-                    border: OutlineInputBorder(),
+                    prefixIcon: const Icon(Icons.description),
+                    border: const OutlineInputBorder(),
+                    helperText: _isOwnerless ? kNoPersonalDataHelper : null,
+                    helperMaxLines: 2,
                   ),
                   maxLines: 3,
                 ),
@@ -626,6 +642,18 @@ class _MaintenanceFormPageState extends State<MaintenanceFormPage> {
                     ),
                   ],
                 ),
+                if (_isOwnerless) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    'Este carro ainda não tem dono no RevisaLog. Notas fiscais '
+                    'ficam pendentes: só a sua oficina as vê, e elas são '
+                    'apagadas em 90 dias se o cliente não aceitar.',
+                    key: const Key('ownerless_attachments_notice'),
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                  ),
+                ],
                 if (_items.isNotEmpty) ...[
                   const SizedBox(height: 16),
                   Text(
