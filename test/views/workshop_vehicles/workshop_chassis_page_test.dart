@@ -116,6 +116,35 @@ void main() {
         find.byKey(const Key('ownerless_attachments_notice')), findsOneWidget);
     expect(find.text(kNoPersonalDataHelper), findsOneWidget);
   });
+
+  testWidgets('after saving the OS it opens that OS to notify the customer',
+      (tester) async {
+    tall(tester);
+    final api = FakeWorkshopApi();
+    await pumpPage(tester, api);
+    await search(tester, _vin);
+
+    await tester.enterText(
+        find.byKey(const Key('workshop_brand_field')), 'Fiat');
+    await tester.enterText(
+        find.byKey(const Key('workshop_model_field')), 'Uno');
+    await tester.enterText(
+        find.byKey(const Key('workshop_year_field')), '2012');
+    await tester.tap(find.byKey(const Key('workshop_create_vehicle')));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+        find.widgetWithText(TextFormField, 'Quilometragem *'), '41000');
+    await tester.tap(find.text('Categoria de Serviço').first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Mecânica').last);
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Salvar'));
+    await tester.tap(find.text('Salvar'));
+    await tester.pumpAndSettle();
+
+    expect(api.requestedMaintenanceId, '501');
+  });
 }
 
 void tall(WidgetTester tester) {

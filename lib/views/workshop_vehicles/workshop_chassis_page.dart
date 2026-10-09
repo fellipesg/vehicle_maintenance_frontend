@@ -7,6 +7,7 @@ import '../../models/workshop_vehicle_lookup.dart';
 import '../../services/api_error.dart';
 import '../../services/api_service.dart';
 import '../../widgets/catalog_autocomplete.dart';
+import '../maintenances/maintenance_detail_page.dart';
 import '../maintenances/maintenance_form_page.dart';
 
 /// Texto de apoio dos campos livres de OS feita sem dono.
@@ -226,16 +227,33 @@ class _WorkshopChassisPageState extends State<WorkshopChassisPage> {
       return;
     }
 
+    int? createdMaintenanceId;
     final saved = await Navigator.of(context).push<bool>(
       MaterialPageRoute(
         builder: (_) => MaintenanceFormPage(
           vehicleId: vehicle.id!,
           isOwnerlessVehicle: true,
+          onCreated: (id) => createdMaintenanceId = id,
         ),
       ),
     );
 
-    if (saved == true && mounted) {
+    if (saved != true || !mounted) {
+      return;
+    }
+
+    // A oficina não tem lista de veículos no app: abre a OS recém-criada, onde fica o cartão
+    // "Avisar o cliente", antes de voltar para o início.
+    if (createdMaintenanceId != null) {
+      await Navigator.of(context).push<void>(
+        MaterialPageRoute(
+          builder: (_) =>
+              MaintenanceDetailPage(maintenanceId: createdMaintenanceId!),
+        ),
+      );
+    }
+
+    if (mounted) {
       Navigator.of(context).pop(true);
     }
   }

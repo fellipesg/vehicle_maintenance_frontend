@@ -79,10 +79,25 @@ class FakeWorkshopApi extends ApiService {
     },
   };
 
+  String? requestedMaintenanceId;
+
   Object? whatsappError;
   Object? emailError;
   String? whatsappPhone;
   String? emailSent;
+
+  @override
+  Future<Response> createMaintenance(FormData formData) async =>
+      okResponse('/maintenances', {
+        'success': true,
+        'data': {'id': 501},
+      });
+
+  @override
+  Future<Response> getMaintenance(String id) async {
+    requestedMaintenanceId = id;
+    throw Exception('sem detalhe no teste');
+  }
 
   @override
   Future<Response> getMe() async => okResponse('/me', {

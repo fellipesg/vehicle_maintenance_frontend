@@ -22,11 +22,16 @@ class MaintenanceFormPage extends StatefulWidget {
   /// anexos pendentes e o lembrete de não incluir dados do cliente.
   final bool isOwnerlessVehicle;
 
+  /// Chamado com o id da OS recém-criada, antes de fechar a tela. A oficina sem lista de
+  /// veículos usa o id para abrir a OS e avisar o cliente.
+  final ValueChanged<int>? onCreated;
+
   const MaintenanceFormPage({
     super.key,
     required this.vehicleId,
     this.maintenance,
     this.isOwnerlessVehicle = false,
+    this.onCreated,
   });
 
   @override
@@ -403,6 +408,12 @@ class _MaintenanceFormPageState extends State<MaintenanceFormPage> {
             backgroundColor: Colors.green,
           ),
         );
+        final createdId = response.data['data'] is Map
+            ? int.tryParse('${response.data['data']['id']}')
+            : null;
+        if (widget.maintenance == null && createdId != null) {
+          widget.onCreated?.call(createdId);
+        }
         // Pop and return true to trigger list refresh
         Navigator.of(context).pop(true);
       } else {
