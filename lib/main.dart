@@ -9,7 +9,7 @@ import 'utils/api_base_url.dart';
 import 'services/push_notification_setup.dart';
 import 'services/notification_navigation.dart';
 import 'views/home_page.dart';
-import 'views/auth/login_hub_page.dart';
+import 'views/onboarding/launch_gate.dart';
 import 'repositories/vehicle_repository.dart';
 import 'services/api_service.dart';
 import 'services/auth_service.dart';
@@ -163,9 +163,10 @@ class _MyAppState extends State<MyApp> {
               theme: AppTheme.light,
               darkTheme: AppTheme.dark,
               themeMode: themeController.mode,
-              home: _authService.isAuthenticated
-                  ? const HomePage()
-                  : const LoginHubPage(),
+              home: LaunchGate(
+                isAuthenticated: _authService.isAuthenticated,
+                authenticatedBuilder: (_) => const HomePage(),
+              ),
             ),
           );
         },
