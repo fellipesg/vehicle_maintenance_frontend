@@ -2,17 +2,22 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../home_page.dart';
 import '../../services/auth_service.dart';
+import '../../services/cep_service.dart';
+import '../../utils/cep_autofill.dart';
 
 /// Auto-cadastro é só de proprietário: o backend recusa `garage`/`workshop` e
 /// grava `user_type = 'user'` de qualquer forma.
 class RegisterPage extends StatefulWidget {
-  const RegisterPage({super.key});
+  const RegisterPage({super.key, this.cepService});
+
+  /// Injetado nos testes para não bater no ViaCEP.
+  final CepService? cepService;
 
   @override
   State<RegisterPage> createState() => _RegisterPageState();
 }
 
-class _RegisterPageState extends State<RegisterPage> {
+class _RegisterPageState extends State<RegisterPage> with CepAutofill {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
@@ -32,7 +37,27 @@ class _RegisterPageState extends State<RegisterPage> {
   bool _obscureConfirmPassword = true;
 
   @override
+  late final CepService cepService = widget.cepService ?? CepService();
+
+  @override
+  TextEditingController get cepField => _postalCodeController;
+
+  @override
+  void onCepResolved(CepAddress address) {
+    _streetController.text = address.street;
+    _cityController.text = address.city;
+    _stateController.text = address.state;
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    listenToCepField();
+  }
+
+  @override
   void dispose() {
+    stopListeningToCepField();
     _nameController.dispose();
     _emailController.dispose();
     _phoneController.dispose();
@@ -249,12 +274,26 @@ class _RegisterPageState extends State<RegisterPage> {
                     Expanded(
                       flex: 2,
                       child: TextFormField(
+                        key: const Key('register_cep_field'),
                         controller: _postalCodeController,
                         keyboardType: TextInputType.number,
-                        decoration: const InputDecoration(
+                        decoration: InputDecoration(
                           labelText: 'CEP',
-                          prefixIcon: Icon(Icons.pin_drop),
-                          border: OutlineInputBorder(),
+                          prefixIcon: const Icon(Icons.pin_drop),
+                          border: const OutlineInputBorder(),
+                          helperText: 'Preenche o endereço',
+                          suffixIcon: isLookingUpCep
+                              ? const Padding(
+                                  padding: EdgeInsets.all(12),
+                                  child: SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  ),
+                                )
+                              : null,
                         ),
                       ),
                     ),
