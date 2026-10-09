@@ -122,6 +122,10 @@ class _OwnerDecisionSheetState extends State<OwnerDecisionSheet> {
     final muted = theme.colorScheme.onSurfaceVariant;
     final attachCount = _record.attachmentsCount;
     final reason = _attachDisabledReason;
+    final willDeletePendingAttachments = _record.canDecide &&
+        _record.attachmentsStatus == AttachmentsStatus.pending &&
+        attachCount > 0 &&
+        !_attach;
 
     return Padding(
       padding: EdgeInsets.only(
@@ -207,6 +211,17 @@ class _OwnerDecisionSheetState extends State<OwnerDecisionSheet> {
                   ? null
                   : (value) => setState(() => _attach = value),
             ),
+            if (willDeletePendingAttachments)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Text(
+                  key: const Key('decision_attachments_will_be_deleted'),
+                  'As notas fiscais e fotos que você não aceitar serão apagadas '
+                  'ao confirmar.',
+                  style: theme.textTheme.bodySmall
+                      ?.copyWith(color: theme.colorScheme.error),
+                ),
+              ),
             SwitchListTile(
               key: const Key('decision_hide_switch'),
               contentPadding: EdgeInsets.zero,

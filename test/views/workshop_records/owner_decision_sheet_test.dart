@@ -129,6 +129,63 @@ void main() {
     expect(api.sentDecision?['link'], isTrue);
     expect(api.sentDecision?['attach_files'], isFalse);
   });
+
+  testWidgets('warns that pending attachments are deleted when attach is off',
+      (tester) async {
+    tall(tester);
+    final api = FakeWorkshopApi();
+    await pumpSheet(tester, api, recordJson());
+
+    expect(
+      find.byKey(const Key('decision_attachments_will_be_deleted')),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('hides the deletion warning once attach is turned on',
+      (tester) async {
+    tall(tester);
+    final api = FakeWorkshopApi();
+    await pumpSheet(tester, api, recordJson());
+
+    await tester.tap(find.byKey(const Key('decision_link_switch')));
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('decision_attach_switch')));
+    await tester.pump();
+
+    expect(
+      find.byKey(const Key('decision_attachments_will_be_deleted')),
+      findsNothing,
+    );
+  });
+
+  testWidgets('no deletion warning when there are no pending attachments',
+      (tester) async {
+    tall(tester);
+    final api = FakeWorkshopApi();
+    await pumpSheet(
+      tester,
+      api,
+      recordJson(attachmentsStatus: 'none'),
+    );
+
+    expect(
+      find.byKey(const Key('decision_attachments_will_be_deleted')),
+      findsNothing,
+    );
+  });
+
+  testWidgets('no deletion warning when the owner cannot decide yet',
+      (tester) async {
+    tall(tester);
+    final api = FakeWorkshopApi();
+    await pumpSheet(tester, api, recordJson(canDecide: false));
+
+    expect(
+      find.byKey(const Key('decision_attachments_will_be_deleted')),
+      findsNothing,
+    );
+  });
 }
 
 void tall(WidgetTester tester) {
