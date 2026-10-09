@@ -42,10 +42,16 @@ class _OwnerDecisionSheetState extends State<OwnerDecisionSheet> {
 
   WorkshopRecord get _record => widget.record;
 
+  /// Sem posse comprovada nada pode ser escolhido: recusar apaga as notas e
+  /// ocultar esconde o registro dos próximos donos.
+  bool get _locked => _isSubmitting || !_record.canDecide;
+
   /// Anexos aceitos podem ser revogados; anexos pendentes só aceitos com posse
   /// verificada (`can_accept_attachments`).
   bool get _attachEnabled =>
-      _link && (_record.canAcceptAttachments || _record.attachmentsAccepted);
+      _record.canDecide &&
+      _link &&
+      (_record.canAcceptAttachments || _record.attachmentsAccepted);
 
   @override
   void initState() {
@@ -144,6 +150,22 @@ class _OwnerDecisionSheetState extends State<OwnerDecisionSheet> {
               'o que fazer — você pode mudar depois.',
               style: theme.textTheme.bodyMedium,
             ),
+            if (!_record.canDecide) ...[
+              const SizedBox(height: 12),
+              Container(
+                key: const Key('decision_needs_verification'),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Text(
+                  'Para decidir sobre os registros da oficina, confirme que o '
+                  'carro é seu enviando o CRLV-e no site do RevisaLog. Depois '
+                  'volte aqui.',
+                ),
+              ),
+            ],
             const SizedBox(height: 8),
             SwitchListTile(
               key: const Key('decision_link_switch'),
@@ -156,7 +178,7 @@ class _OwnerDecisionSheetState extends State<OwnerDecisionSheet> {
                 'básicos.',
               ),
               value: _link,
-              onChanged: _isSubmitting
+              onChanged: _locked
                   ? null
                   : (value) => setState(() {
                         _link = value;
@@ -195,9 +217,8 @@ class _OwnerDecisionSheetState extends State<OwnerDecisionSheet> {
                 'oficina que o fez.',
               ),
               value: _hide,
-              onChanged: _isSubmitting
-                  ? null
-                  : (value) => setState(() => _hide = value),
+              onChanged:
+                  _locked ? null : (value) => setState(() => _hide = value),
             ),
             if (_error != null) ...[
               const SizedBox(height: 8),
@@ -217,7 +238,7 @@ class _OwnerDecisionSheetState extends State<OwnerDecisionSheet> {
             const SizedBox(height: 16),
             FilledButton(
               key: const Key('decision_submit'),
-              onPressed: _isSubmitting ? null : _submit,
+              onPressed: _locked ? null : _submit,
               child: _isSubmitting
                   ? const SizedBox(
                       width: 20,

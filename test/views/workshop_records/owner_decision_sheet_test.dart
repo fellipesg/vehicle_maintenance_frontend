@@ -42,6 +42,30 @@ void main() {
     expect(attach.onChanged, isNull);
   });
 
+  testWidgets('locks every choice until ownership is verified', (tester) async {
+    tall(tester);
+    final api = FakeWorkshopApi();
+    await pumpSheet(tester, api, recordJson(canDecide: false));
+
+    expect(
+        find.byKey(const Key('decision_needs_verification')), findsOneWidget);
+    for (final key in [
+      'decision_link_switch',
+      'decision_attach_switch',
+      'decision_hide_switch',
+    ]) {
+      expect(tester.widget<SwitchListTile>(find.byKey(Key(key))).onChanged,
+          isNull);
+    }
+    expect(
+      tester
+          .widget<FilledButton>(find.byKey(const Key('decision_submit')))
+          .onPressed,
+      isNull,
+    );
+    expect(api.sentDecision, isNull);
+  });
+
   testWidgets('sends link, attach and hide choices', (tester) async {
     tall(tester);
     final api = FakeWorkshopApi();

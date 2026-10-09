@@ -22,6 +22,7 @@ Map<String, dynamic> recordJson({
   String ownerStatus = 'pending',
   String attachmentsStatus = 'pending',
   bool canAccept = true,
+  bool canDecide = true,
   bool hidden = false,
 }) =>
     {
@@ -47,6 +48,7 @@ Map<String, dynamic> recordJson({
       'attachments_status': attachmentsStatus,
       'hidden_from_public': hidden,
       'can_accept_attachments': canAccept,
+      'can_decide': canDecide,
     };
 
 class FakeWorkshopApi extends ApiService {

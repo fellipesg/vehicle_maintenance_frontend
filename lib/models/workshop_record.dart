@@ -19,6 +19,7 @@ class WorkshopRecord {
     this.attachmentsStatus = AttachmentsStatus.none,
     this.hiddenFromPublic = false,
     this.canAcceptAttachments = false,
+    this.canDecide = true,
   });
 
   final int id;
@@ -36,6 +37,10 @@ class WorkshopRecord {
   final AttachmentsStatus attachmentsStatus;
   final bool hiddenFromPublic;
   final bool canAcceptAttachments;
+
+  /// Só o dono comprovado pelo CRLV-e decide (`can_decide`). Sem o campo, a
+  /// API é anterior a essa regra e o servidor continua sendo quem recusa.
+  final bool canDecide;
 
   int get attachmentsCount => invoicesCount + photosCount;
 
@@ -77,6 +82,8 @@ class WorkshopRecord {
           AttachmentsStatus.parse(json['attachments_status']?.toString()),
       hiddenFromPublic: json['hidden_from_public'] == true,
       canAcceptAttachments: json['can_accept_attachments'] == true,
+      canDecide:
+          json.containsKey('can_decide') ? json['can_decide'] == true : true,
     );
   }
 
