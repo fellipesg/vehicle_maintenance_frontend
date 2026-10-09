@@ -9,6 +9,7 @@ import '../../repositories/vehicle_repository.dart';
 import '../../services/api_error.dart';
 import '../../services/api_service.dart';
 import '../../widgets/vehicle_cover_avatar.dart';
+import '../../widgets/catalog_autocomplete.dart';
 import '../../widgets/cover_framing.dart';
 import '../../widgets/cover_image_cropper.dart';
 import '../../widgets/terms_scroll_acceptance.dart';
@@ -45,9 +46,24 @@ class _VehicleFormPageState extends State<VehicleFormPage> {
   String? _existingLandscapeUrl;
   String? _existingPortraitUrl;
 
+  final _brandFocusNode = FocusNode();
+  final _modelFocusNode = FocusNode();
+
+  /// Sugestões do catálogo. Vazias enquanto carregam ou se a requisição falhar:
+  /// os campos continuam aceitando texto livre, porque o catálogo não cobre
+  /// todo modelo novo ou importado e o backend aceita qualquer string.
+  List<String> _catalogBrands = const [];
+  List<String> _catalogModels = const [];
+
+  /// Marca cujos modelos já estão em `_catalogModels`, para não repetir a busca.
+  String? _modelsLoadedForBrand;
+
+  bool _hasBrandText = false;
+
   @override
   void initState() {
     super.initState();
+    _loadCatalogBrands();
     if (widget.vehicle != null) {
       _licensePlateController.text = widget.vehicle!.licensePlate;
       _renavamController.text = widget.vehicle!.renavam ?? '';
@@ -66,6 +82,90 @@ class _VehicleFormPageState extends State<VehicleFormPage> {
     } else {
       _loadTerms();
     }
+
+    _hasBrandText = _brandController.text.trim().isNotEmpty;
+    _brandController.addListener(_onBrandTextChanged);
+
+    // Editando: já há marca, então os modelos dela podem vir junto.
+    if (_hasBrandText) {
+      _loadCatalogModels(_brandController.text.trim());
+    }
+  }
+
+  /// O campo de modelo liga e desliga conforme a marca. Reconstrói só na virada
+  /// entre vazio e preenchido, não a cada tecla.
+  void _onBrandTextChanged() {
+    final hasText = _brandController.text.trim().isNotEmpty;
+
+    if (hasText != _hasBrandText) {
+      setState(() => _hasBrandText = hasText);
+    }
+  }
+
+  /// Falha silenciosa de propósito: sem sugestões o formulário ainda funciona, e
+  /// um erro aqui não deve atrapalhar quem está cadastrando.
+  Future<void> _loadCatalogBrands() async {
+    try {
+      final apiService = Provider.of<ApiService>(context, listen: false);
+      final brands = await apiService.getCatalogBrands();
+
+      if (mounted) {
+        setState(() => _catalogBrands = brands);
+      }
+    } catch (_) {
+      // Sem catálogo: marca e modelo seguem como texto livre.
+    }
+  }
+
+  Future<void> _loadCatalogModels(String brand) async {
+    if (brand.isEmpty || _modelsLoadedForBrand == brand) {
+      return;
+    }
+
+    _modelsLoadedForBrand = brand;
+
+    try {
+      final apiService = Provider.of<ApiService>(context, listen: false);
+      final models = await apiService.getCatalogModels(brand);
+
+      if (mounted) {
+        setState(() => _catalogModels = models);
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _catalogModels = const []);
+      }
+    }
+  }
+
+  /// Chamado quando a marca é escolhida na lista: o nome vem canônico, que é o
+  /// que o endpoint de modelos espera (ele resolve por chave exata).
+  void _onBrandSelected(String brand) {
+    final previous = _modelsLoadedForBrand;
+
+    if (previous != null && previous != brand) {
+      // Trocou de marca: o modelo escolhido era de outra e não vale mais, como
+      // no portal web, que repovoa o select de modelo a cada troca.
+      setState(() {
+        _catalogModels = const [];
+        _modelController.clear();
+      });
+    }
+
+    _loadCatalogModels(brand);
+  }
+
+  /// O catálogo é curado e pode ter perdido uma marca ou modelo que algum
+  /// veículo já usa. Nesse caso o valor atual entra na lista, como o web faz,
+  /// para a edição não ficar impossível.
+  List<String> _withCurrentValue(List<String> options, String current) {
+    final value = current.trim();
+
+    if (value.isEmpty || options.isEmpty || options.contains(value)) {
+      return options;
+    }
+
+    return [value, ...options];
   }
 
   Future<void> _loadTerms() async {
@@ -131,6 +231,9 @@ class _VehicleFormPageState extends State<VehicleFormPage> {
   void dispose() {
     _licensePlateController.dispose();
     _renavamController.dispose();
+    _brandController.removeListener(_onBrandTextChanged);
+    _brandFocusNode.dispose();
+    _modelFocusNode.dispose();
     _brandController.dispose();
     _modelController.dispose();
     _yearController.dispose();
@@ -464,36 +567,46 @@ class _VehicleFormPageState extends State<VehicleFormPage> {
                   children: [
                     Expanded(
                       flex: 2,
-                      child: TextFormField(
+                      child: CatalogAutocomplete(
+                        key: const Key('vehicle_brand_field'),
                         controller: _brandController,
+                        focusNode: _brandFocusNode,
+                        options: _withCurrentValue(
+                          _catalogBrands,
+                          widget.vehicle?.brand ?? '',
+                        ),
+                        onSelected: _onBrandSelected,
                         decoration: const InputDecoration(
                           labelText: 'Marca *',
                           prefixIcon: Icon(Icons.directions_car),
                           border: OutlineInputBorder(),
                         ),
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Por favor, insira a marca';
-                          }
-                          return null;
-                        },
+                        requiredMessage: 'Por favor, selecione a marca',
+                        invalidMessage: 'Escolha uma marca da lista',
                       ),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
                       flex: 3,
-                      child: TextFormField(
+                      child: CatalogAutocomplete(
+                        key: const Key('vehicle_model_field'),
                         controller: _modelController,
-                        decoration: const InputDecoration(
-                          labelText: 'Modelo *',
-                          border: OutlineInputBorder(),
+                        focusNode: _modelFocusNode,
+                        options: _withCurrentValue(
+                          _catalogModels,
+                          widget.vehicle?.model ?? '',
                         ),
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Por favor, insira o modelo';
-                          }
-                          return null;
-                        },
+                        // Como no web: sem marca não há lista de modelo.
+                        enabled: _hasBrandText,
+                        decoration: InputDecoration(
+                          labelText: 'Modelo *',
+                          border: const OutlineInputBorder(),
+                          hintText: !_hasBrandText
+                              ? 'Selecione a marca primeiro'
+                              : null,
+                        ),
+                        requiredMessage: 'Por favor, selecione o modelo',
+                        invalidMessage: 'Escolha um modelo da lista',
                       ),
                     ),
                   ],

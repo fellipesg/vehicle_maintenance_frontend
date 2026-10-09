@@ -1,25 +1,28 @@
-import 'dart:convert';
 import 'dart:io';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import '../../models/workshop.dart';
 import '../../services/api_error.dart';
 import '../../services/api_service.dart';
+import '../../services/cep_service.dart';
+import '../../utils/cep_autofill.dart';
 
 class WorkshopFormPage extends StatefulWidget {
   final Workshop? workshop;
 
-  const WorkshopFormPage({super.key, this.workshop});
+  /// Injetado nos testes para não bater no ViaCEP.
+  final CepService? cepService;
+
+  const WorkshopFormPage({super.key, this.workshop, this.cepService});
 
   @override
   State<WorkshopFormPage> createState() => _WorkshopFormPageState();
 }
 
-class _WorkshopFormPageState extends State<WorkshopFormPage> {
+class _WorkshopFormPageState extends State<WorkshopFormPage> with CepAutofill {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _phoneController = TextEditingController();
@@ -36,7 +39,6 @@ class _WorkshopFormPageState extends State<WorkshopFormPage> {
   final _stateController = TextEditingController();
 
   bool _isLoading = false;
-  bool _isLoadingCep = false;
   final ImagePicker _imagePicker = ImagePicker();
   File? _logoFile;
   String? _logoPreviewUrl;
@@ -47,7 +49,31 @@ class _WorkshopFormPageState extends State<WorkshopFormPage> {
     if (widget.workshop != null) {
       _populateForm(widget.workshop!);
     }
-    _cepController.addListener(_onCepChanged);
+    listenToCepField();
+  }
+
+  @override
+  late final CepService cepService = widget.cepService ?? CepService();
+
+  @override
+  TextEditingController get cepField => _cepController;
+
+  @override
+  void onCepResolved(CepAddress address) {
+    _streetController.text = address.street;
+    _neighborhoodController.text = address.neighborhood;
+    _cityController.text = address.city;
+    _stateController.text = address.state;
+  }
+
+  @override
+  void onCepNotFound() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('CEP não encontrado'),
+        backgroundColor: Colors.orange,
+      ),
+    );
   }
 
   @override
@@ -58,7 +84,7 @@ class _WorkshopFormPageState extends State<WorkshopFormPage> {
     _emailController.dispose();
     _facebookController.dispose();
     _instagramController.dispose();
-    _cepController.removeListener(_onCepChanged);
+    stopListeningToCepField();
     _cepController.dispose();
     _streetController.dispose();
     _numberController.dispose();
@@ -97,51 +123,6 @@ class _WorkshopFormPageState extends State<WorkshopFormPage> {
       setState(() {
         _logoFile = File(picked.path);
         _logoPreviewUrl = picked.path;
-      });
-    }
-  }
-
-  void _onCepChanged() {
-    final cep = _cepController.text.replaceAll(RegExp(r'\D'), '');
-    if (cep.length == 8) {
-      _fetchCepData(cep);
-    }
-  }
-
-  Future<void> _fetchCepData(String cep) async {
-    setState(() {
-      _isLoadingCep = true;
-    });
-
-    try {
-      final response = await http.get(
-        Uri.parse('https://viacep.com.br/ws/$cep/json/'),
-      );
-
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-
-        if (data['erro'] == null) {
-          setState(() {
-            _streetController.text = data['logradouro'] ?? '';
-            _neighborhoodController.text = data['bairro'] ?? '';
-            _cityController.text = data['localidade'] ?? '';
-            _stateController.text = data['uf'] ?? '';
-          });
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('CEP não encontrado'),
-              backgroundColor: Colors.orange,
-            ),
-          );
-        }
-      }
-    } catch (e) {
-      // Silently fail - user can fill manually
-    } finally {
-      setState(() {
-        _isLoadingCep = false;
       });
     }
   }
@@ -404,7 +385,7 @@ class _WorkshopFormPageState extends State<WorkshopFormPage> {
                   decoration: InputDecoration(
                     labelText: 'CEP *',
                     prefixIcon: const Icon(Icons.location_on),
-                    suffixIcon: _isLoadingCep
+                    suffixIcon: isLookingUpCep
                         ? const Padding(
                             padding: EdgeInsets.all(12.0),
                             child: SizedBox(

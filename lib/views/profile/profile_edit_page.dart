@@ -5,16 +5,21 @@ import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
 import '../../services/auth_service.dart';
+import '../../services/cep_service.dart';
+import '../../utils/cep_autofill.dart';
 import '../../widgets/user_avatar.dart';
 
 class ProfileEditPage extends StatefulWidget {
-  const ProfileEditPage({super.key});
+  const ProfileEditPage({super.key, this.cepService});
+
+  /// Injetado nos testes para não bater no ViaCEP.
+  final CepService? cepService;
 
   @override
   State<ProfileEditPage> createState() => _ProfileEditPageState();
 }
 
-class _ProfileEditPageState extends State<ProfileEditPage> {
+class _ProfileEditPageState extends State<ProfileEditPage> with CepAutofill {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _phoneController = TextEditingController();
@@ -33,9 +38,25 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
   bool _isLoading = false;
 
   @override
+  late final CepService cepService = widget.cepService ?? CepService();
+
+  @override
+  TextEditingController get cepField => _postalCodeController;
+
+  @override
+  void onCepResolved(CepAddress address) {
+    _streetController.text = address.street;
+    _cityController.text = address.city;
+    _stateController.text = address.state;
+  }
+
+  @override
   void initState() {
     super.initState();
     _loadUser();
+    // Depois do _loadUser: preencher o campo com o CEP já salvo não pode
+    // disparar uma consulta que sobrescreva o endereço do usuário.
+    listenToCepField();
   }
 
   void _loadUser() {
@@ -59,6 +80,7 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
 
   @override
   void dispose() {
+    stopListeningToCepField();
     _nameController.dispose();
     _phoneController.dispose();
     _postalCodeController.dispose();
@@ -256,11 +278,23 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
                 ),
                 const SizedBox(height: 12),
                 TextFormField(
+                  key: const Key('profile_cep_field'),
                   controller: _postalCodeController,
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     labelText: 'CEP',
-                    prefixIcon: Icon(Icons.markunread_mailbox),
-                    border: OutlineInputBorder(),
+                    prefixIcon: const Icon(Icons.markunread_mailbox),
+                    border: const OutlineInputBorder(),
+                    helperText: 'Preenche rua, cidade e UF automaticamente',
+                    suffixIcon: isLookingUpCep
+                        ? const Padding(
+                            padding: EdgeInsets.all(12),
+                            child: SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                          )
+                        : null,
                   ),
                   keyboardType: TextInputType.number,
                 ),
