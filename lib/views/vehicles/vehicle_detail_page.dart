@@ -8,6 +8,7 @@ import 'package:provider/provider.dart';
 
 import '../../models/vehicle.dart';
 import '../../repositories/vehicle_repository.dart';
+import '../../services/api_error.dart';
 import '../../services/api_service.dart';
 import '../../utils/pdf_download_file_name.dart';
 import '../../widgets/vehicle_cover_avatar.dart';
@@ -39,6 +40,11 @@ class _VehicleDetailPageState extends State<VehicleDetailPage> {
   int _maintenanceCount = 0;
   Map<String, dynamic>? _timeline;
   bool? _verifiedFilter;
+
+  /// Incrementado ao iniciar e ao cancelar uma exportação de PDF. A geração em
+  /// curso compara com o valor que capturou: se mudou, ela para de consultar o
+  /// status e não abre o visualizador.
+  int _exportGeneration = 0;
 
   @override
   void initState() {
@@ -133,8 +139,22 @@ class _VehicleDetailPageState extends State<VehicleDetailPage> {
     }
   }
 
+  /// Rápido no começo, porque PDFs pequenos ficam prontos em segundos, e mais
+  /// espaçado depois, quando insistir de 2 em 2 segundos só gasta requisição.
+  static Duration _pdfPollDelay(int attempt) {
+    if (attempt < 5) {
+      return const Duration(seconds: 2);
+    }
+    if (attempt < 15) {
+      return const Duration(seconds: 4);
+    }
+
+    return const Duration(seconds: 6);
+  }
+
   Future<void> _handleExportPdf() async {
     ScaffoldMessengerState? messenger;
+    final generation = ++_exportGeneration;
 
     try {
       final apiService = Provider.of<ApiService>(context, listen: false);
@@ -142,8 +162,8 @@ class _VehicleDetailPageState extends State<VehicleDetailPage> {
       if (mounted) {
         messenger = ScaffoldMessenger.of(context);
         messenger.showSnackBar(
-          const SnackBar(
-            content: Row(
+          SnackBar(
+            content: const Row(
               children: [
                 SizedBox(
                   width: 20,
@@ -154,7 +174,17 @@ class _VehicleDetailPageState extends State<VehicleDetailPage> {
                 Text('Gerando PDF...'),
               ],
             ),
-            duration: Duration(minutes: 5),
+            duration: const Duration(minutes: 5),
+            // Sem ação, um snackbar de 5 minutos não pode ser dispensado no
+            // iOS: ficava preso na tela durante toda a geração.
+            action: SnackBarAction(
+              label: 'Cancelar',
+              onPressed: () {
+                if (mounted) {
+                  setState(() => _exportGeneration++);
+                }
+              },
+            ),
           ),
         );
       }
@@ -167,20 +197,22 @@ class _VehicleDetailPageState extends State<VehicleDetailPage> {
         throw Exception('Não foi possível iniciar a exportação do PDF.');
       }
 
-      const pollInterval = Duration(seconds: 2);
-      const maxAttempts = 90;
+      // Janela igual à de antes, com menos requisições: o polling fixo de 2s
+      // chegava a 30 req/min contra o limite de 60 de throttle:api, e bastava
+      // navegar durante a geração para arriscar um 429.
+      final deadline = DateTime.now().add(const Duration(minutes: 3));
       Map<String, dynamic>? exportData;
 
-      for (var attempt = 0; attempt < maxAttempts; attempt++) {
-        if (!mounted) {
+      for (var attempt = 0; DateTime.now().isBefore(deadline); attempt++) {
+        if (!mounted || _exportGeneration != generation) {
           return;
         }
 
         if (attempt > 0) {
-          await Future<void>.delayed(pollInterval);
+          await Future<void>.delayed(_pdfPollDelay(attempt));
         }
 
-        if (!mounted) {
+        if (!mounted || _exportGeneration != generation) {
           return;
         }
 
@@ -213,7 +245,8 @@ class _VehicleDetailPageState extends State<VehicleDetailPage> {
       final filenameFromApi = exportData['filename'] as String?;
       final response = await apiService.downloadVehiclePdfExport(exportId);
 
-      if (!mounted) {
+      // Cancelar durante o download também não deve abrir o visualizador.
+      if (!mounted || _exportGeneration != generation) {
         return;
       }
 
@@ -232,7 +265,7 @@ class _VehicleDetailPageState extends State<VehicleDetailPage> {
         messenger.hideCurrentSnackBar();
       }
 
-      if (!mounted) {
+      if (!mounted || _exportGeneration != generation) {
         return;
       }
 
@@ -250,10 +283,11 @@ class _VehicleDetailPageState extends State<VehicleDetailPage> {
         messenger.hideCurrentSnackBar();
       }
 
-      if (mounted) {
+      // Quem cancelou não precisa ver o erro da requisição interrompida.
+      if (mounted && _exportGeneration == generation) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Erro ao gerar PDF: $e'),
+            content: Text(apiErrorMessage(e, fallback: 'Erro ao gerar PDF')),
             backgroundColor: Colors.red,
           ),
         );

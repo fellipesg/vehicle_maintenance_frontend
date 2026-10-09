@@ -137,11 +137,6 @@ class ApiService {
     );
   }
 
-  // Vehicle endpoints
-  Future<Response> getVehicles({Map<String, dynamic>? queryParams}) async {
-    return await _dio.get('/vehicles', queryParameters: queryParams);
-  }
-
   // Vehicle catalog (sugestões de marca e modelo)
 
   /// Marcas ativas do catálogo. O backend devolve uma lista de strings.
@@ -179,6 +174,7 @@ class ApiService {
         .toList();
   }
 
+  // Vehicle endpoints
   Future<Response> getVehicle(String id) async {
     return await _dio.get('/vehicles/$id');
   }
@@ -188,14 +184,6 @@ class ApiService {
     return VehicleLookupResult.fromApi(
       Map<String, dynamic>.from(response.data as Map),
     );
-  }
-
-  Future<Response> searchVehicleRaw(String identifier) async {
-    return await _dio.get('/vehicles/search/$identifier');
-  }
-
-  Future<Response> getVehiclePlates(int vehicleId) async {
-    return await _dio.get('/vehicles/$vehicleId/plates');
   }
 
   Future<Response> createVehicle(Map<String, dynamic> data) async {
@@ -260,15 +248,6 @@ class ApiService {
     );
   }
 
-  Future<Response> downloadFromUrl(String url) async {
-    return await _dio.get(
-      url,
-      options: Options(
-        responseType: ResponseType.bytes,
-      ),
-    );
-  }
-
   Future<Response> getVehicleTimeline(String vehicleId) async {
     return await _dio.get('/vehicles/$vehicleId/timeline');
   }
@@ -314,16 +293,6 @@ class ApiService {
   }
 
   // Invoice endpoints
-  Future<Response> uploadInvoice(FormData formData) async {
-    return await _dio.post(
-      '/invoices/upload',
-      data: formData,
-      options: Options(
-        contentType: 'multipart/form-data',
-      ),
-    );
-  }
-
   Future<Response> downloadInvoice(String id) async {
     return await _dio.get(
       '/invoices/$id/download',
@@ -389,10 +358,6 @@ class ApiService {
         'per_page': perPage,
       },
     );
-  }
-
-  Future<Response> deleteWorkshop(String id) async {
-    return await _dio.delete('/workshops/$id');
   }
 
   // Profile endpoints

@@ -1,7 +1,15 @@
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/foundation.dart';
 
 import 'local_notification_service.dart';
 import 'notification_navigation.dart';
+
+/// O título do push é conteúdo do usuário: fica fora de builds de release.
+void _log(String message) {
+  if (kDebugMode) {
+    debugPrint(message);
+  }
+}
 
 class PushNotificationSetup {
   static bool _configured = false;
@@ -24,11 +32,11 @@ class PushNotificationSetup {
       final body = notification?.body ?? message.data['body'];
 
       if (title == null || body == null) {
-        print('🔔 Mensagem FCM recebida sem título/corpo.');
+        _log('🔔 Mensagem FCM recebida sem título/corpo.');
         return;
       }
 
-      print('🔔 FCM recebido: $title');
+      _log('🔔 FCM recebido: $title');
       onPushReceived?.call();
 
       await LocalNotificationService.instance.show(
