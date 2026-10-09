@@ -66,6 +66,17 @@ Finder _modelField() => find.descendant(
       matching: find.byType(TextFormField),
     );
 
+Vehicle _vehicle() => Vehicle(
+      id: 7,
+      licensePlate: 'ABC1D23',
+      renavam: '12345678901',
+      brand: 'Volkswagen',
+      model: 'Gol',
+      year: 2020,
+      chassis: '9BWZZZ377VT004251',
+      currentKilometers: 10000,
+    );
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -108,50 +119,94 @@ void main() {
     expect(find.text('Argo'), findsOneWidget);
   });
 
-  testWidgets('a brand outside the catalog keeps the field usable',
+  // Pelo fluxo de edição: no cadastro novo o botão só habilita depois do aceite
+  // dos termos, e o tap não chegaria a validar nada.
+  testWidgets('a brand outside the catalog is refused', (tester) async {
+    final api = _CatalogApiService();
+
+    await tester.pumpWidget(_wrap(VehicleFormPage(vehicle: _vehicle()), api));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(_brandField(), 'Troller');
+    await tester.pumpAndSettle();
+
+    // Lista fechada, como o <select> do portal web: o que não está no catálogo
+    // entra pelo /admin/marcas, não digitando no formulário.
+    await tester.ensureVisible(find.text('Atualizar'));
+    await tester.tap(find.text('Atualizar'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Escolha uma marca da lista'), findsOneWidget);
+  });
+
+  testWidgets('the model field waits for a brand', (tester) async {
+    final api = _CatalogApiService();
+
+    await tester.pumpWidget(_wrap(const VehicleFormPage(), api));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Selecione a marca primeiro'), findsOneWidget);
+    expect(tester.widget<TextFormField>(_modelField()).enabled, isFalse);
+
+    await tester.enterText(_brandField(), 'Fiat');
+    await tester.pumpAndSettle();
+
+    expect(tester.widget<TextFormField>(_modelField()).enabled, isTrue);
+  });
+
+  testWidgets('changing the brand drops the model chosen for the previous one',
       (tester) async {
     final api = _CatalogApiService();
 
     await tester.pumpWidget(_wrap(const VehicleFormPage(), api));
     await tester.pumpAndSettle();
 
-    await tester.enterText(_brandField(), 'Troller');
-    await tester.enterText(_modelField(), 'T4');
-    await tester.pumpAndSettle();
-
-    // Sugerir não é obrigar: o catálogo não cobre todo importado ou lançamento.
-    expect(find.text('Troller'), findsOneWidget);
-    expect(find.text('T4'), findsOneWidget);
-  });
-
-  testWidgets('a failing catalog does not break the form', (tester) async {
-    final api = _CatalogApiService(brandsError: Exception('offline'));
-
-    await tester.pumpWidget(_wrap(const VehicleFormPage(), api));
-    await tester.pumpAndSettle();
-
+    await tester.tap(_brandField());
     await tester.enterText(_brandField(), 'Fiat');
     await tester.pumpAndSettle();
+    await tester.tap(find.text('Fiat').last);
+    await tester.pumpAndSettle();
 
-    expect(find.text('Fiat'), findsOneWidget);
-    expect(_brandField(), findsOneWidget);
+    await tester.tap(_modelField());
+    await tester.enterText(_modelField(), 'Argo');
+    await tester.pumpAndSettle();
+
+    await tester.tap(_brandField());
+    await tester.enterText(_brandField(), 'Volkswagen');
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Volkswagen').last);
+    await tester.pumpAndSettle();
+
+    // Argo não é modelo de Volkswagen.
+    expect(find.text('Argo'), findsNothing);
+  });
+
+  testWidgets('a failing catalog does not block the form', (tester) async {
+    final api = _CatalogApiService(brandsError: Exception('offline'));
+
+    await tester.pumpWidget(_wrap(VehicleFormPage(vehicle: _vehicle()), api));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(_brandField(), 'Troller');
+    await tester.enterText(_modelField(), '');
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Atualizar'));
+    await tester.tap(find.text('Atualizar'));
+    await tester.pumpAndSettle();
+
+    // Lista de marcas não carregou: não há contra o que validar, e travar a
+    // edição por falha de rede seria pior que aceitar o texto.
+    expect(find.text('Escolha uma marca da lista'), findsNothing);
+
+    // Mas a validação rodou — o modelo, apagado, foi cobrado.
+    expect(find.text('Por favor, selecione o modelo'), findsOneWidget);
   });
 
   testWidgets('editing a vehicle preloads the models of its brand',
       (tester) async {
     final api = _CatalogApiService();
-    final vehicle = Vehicle(
-      id: 7,
-      licensePlate: 'ABC1D23',
-      renavam: '12345678901',
-      brand: 'Volkswagen',
-      model: 'Gol',
-      year: 2020,
-      chassis: '9BWZZZ377VT004251',
-      currentKilometers: 10000,
-    );
 
-    await tester.pumpWidget(_wrap(VehicleFormPage(vehicle: vehicle), api));
+    await tester.pumpWidget(_wrap(VehicleFormPage(vehicle: _vehicle()), api));
     await tester.pumpAndSettle();
 
     expect(api.modelRequests, contains('Volkswagen'));
@@ -178,6 +233,8 @@ void main() {
             focusNode: focusNode,
             options: const ['Fiat', 'Ford'],
             decoration: const InputDecoration(labelText: 'Marca'),
+            requiredMessage: 'Informe a marca',
+            invalidMessage: 'Escolha uma marca da lista',
           ),
         ),
       ));
