@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../models/login_portal.dart';
+import '../onboarding/onboarding_page.dart';
 import 'login_page.dart';
 import 'register_page.dart';
 
@@ -43,14 +44,14 @@ class LoginHubPage extends StatelessWidget {
               ),
               const SizedBox(height: 24),
               ...LoginPortal.values.where((p) => p.showInHub).map(
-                (portal) => Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: _PortalCard(
-                    key: Key('login_hub_portal_${portal.name}'),
-                    portal: portal,
+                    (portal) => Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: _PortalCard(
+                        key: Key('login_hub_portal_${portal.name}'),
+                        portal: portal,
+                      ),
+                    ),
                   ),
-                ),
-              ),
               const SizedBox(height: 16),
               TextButton(
                 onPressed: () {
@@ -74,6 +75,20 @@ class LoginHubPage extends StatelessWidget {
                       ),
                     ],
                   ),
+                ),
+              ),
+              TextButton(
+                key: const Key('login_hub_how_it_works'),
+                onPressed: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const OnboardingPage(reopened: true),
+                    ),
+                  );
+                },
+                child: const Text(
+                  'Como funciona',
+                  style: TextStyle(color: Colors.white70),
                 ),
               ),
             ],
