@@ -16,6 +16,20 @@ void main() {
     expect(plist, contains('<string>Main</string>'));
   });
 
+  test('iOS app declares Portuguese (Brazil) so the App Store lists it', () {
+    final plist = File('ios/Runner/Info.plist').readAsStringSync();
+    final project =
+        File('ios/Runner.xcodeproj/project.pbxproj').readAsStringSync();
+
+    expect(
+      plist,
+      matches(RegExp(
+          r'<key>CFBundleLocalizations</key>\s*<array>\s*<string>pt-BR</string>')),
+    );
+    expect(project, contains('developmentRegion = "pt-BR";'));
+    expect(project, contains('"pt-BR",'));
+  });
+
   test('iOS AppDelegate registers plugins through the scene lifecycle', () {
     final appDelegate = File('ios/Runner/AppDelegate.swift').readAsStringSync();
 
