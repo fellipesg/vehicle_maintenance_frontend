@@ -273,7 +273,8 @@ class _VehicleLinkPageState extends State<VehicleLinkPage> {
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
                         : const Icon(Icons.search),
-                    label: Text(_isSearching ? 'Buscando...' : 'Buscar veículo'),
+                    label:
+                        Text(_isSearching ? 'Buscando...' : 'Buscar veículo'),
                   ),
                 if (_notFoundMessage != null) ...[
                   const SizedBox(height: 16),
@@ -351,7 +352,7 @@ class _VehicleLinkPageState extends State<VehicleLinkPage> {
                     style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 4),
-                  Text('${vehicle.year} · ${vehicle.displayPlate}'),
+                  Text('${vehicle.year} · ${vehicle.plateLabel}'),
                   const SizedBox(height: 4),
                   Text(
                     total == 0
@@ -370,4 +371,3 @@ class _VehicleLinkPageState extends State<VehicleLinkPage> {
     );
   }
 }
-

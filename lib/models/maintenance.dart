@@ -31,6 +31,18 @@ class Maintenance {
   final MaintenanceWarranty? generalWarranty;
   final String? ownerName;
 
+  /// OS feita por oficina em carro sem dono (sem conta no RevisaLog).
+  final bool isOwnerlessRecord;
+
+  /// `pending` | `linked` | `declined`; nulo quando o backend não informa.
+  final String? ownerStatus;
+
+  /// `none` | `pending` | `accepted` | `declined` | `revoked`.
+  final String? attachmentsStatus;
+  final bool hiddenFromPublic;
+  final DateTime? whatsappInvitedAt;
+  final DateTime? emailInvitedAt;
+
   Maintenance({
     this.id,
     required this.vehicleId,
@@ -58,9 +70,18 @@ class Maintenance {
     this.workshop,
     this.generalWarranty,
     this.ownerName,
+    this.isOwnerlessRecord = false,
+    this.ownerStatus,
+    this.attachmentsStatus,
+    this.hiddenFromPublic = false,
+    this.whatsappInvitedAt,
+    this.emailInvitedAt,
   });
 
   bool get hasInvoices => (invoices?.isNotEmpty ?? false);
+
+  /// Registro sem dono que ainda espera a decisão do proprietário.
+  bool get isAwaitingOwner => isOwnerlessRecord && ownerStatus == 'pending';
 
   factory Maintenance.fromJson(Map<String, dynamic> json) {
     final generalWarrantyJson = json['general_warranty'];
@@ -126,6 +147,16 @@ class Maintenance {
           ? MaintenanceWarranty.fromJson(generalWarrantyJson)
           : null,
       ownerName: json['user'] is Map ? json['user']['name']?.toString() : null,
+      isOwnerlessRecord: json['is_ownerless_record'] == true,
+      ownerStatus: json['owner_status']?.toString(),
+      attachmentsStatus: json['attachments_status']?.toString(),
+      hiddenFromPublic: json['hidden_from_public'] == true,
+      whatsappInvitedAt: json['whatsapp_invited_at'] != null
+          ? DateTime.tryParse(json['whatsapp_invited_at'].toString())
+          : null,
+      emailInvitedAt: json['email_invited_at'] != null
+          ? DateTime.tryParse(json['email_invited_at'].toString())
+          : null,
     );
   }
 

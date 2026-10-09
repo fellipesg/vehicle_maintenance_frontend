@@ -5,6 +5,7 @@ import 'package:vehicle_maintenance/repositories/vehicle_repository.dart';
 import 'package:vehicle_maintenance/services/api_service.dart';
 import 'package:vehicle_maintenance/services/auth_service.dart';
 import 'package:vehicle_maintenance/services/notification_inbox.dart';
+import 'package:vehicle_maintenance/services/workshop_records_inbox.dart';
 import 'package:vehicle_maintenance/views/home_page.dart';
 
 void main() {
@@ -26,6 +27,9 @@ void main() {
             ChangeNotifierProvider<VehicleRepository>.value(value: repository),
             ChangeNotifierProvider<NotificationInbox>(
               create: (_) => NotificationInbox(apiService),
+            ),
+            ChangeNotifierProvider<WorkshopRecordsInbox>(
+              create: (_) => WorkshopRecordsInbox(apiService),
             ),
           ],
           child: const HomePage(),

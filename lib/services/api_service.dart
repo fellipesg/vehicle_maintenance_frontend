@@ -360,6 +360,78 @@ class ApiService {
     );
   }
 
+  // Registros de oficina em carros sem dono
+
+  /// Usuário logado. Traz `pending_workshop_records_count` (ver
+  /// `WorkshopRecordsInbox`, único lugar que lê o campo).
+  Future<Response> getMe() async {
+    return await _dio.get('/me');
+  }
+
+  /// `status`: `pending` (padrão do backend) ou `all`.
+  Future<Response> getWorkshopRecords({String status = 'pending'}) async {
+    return await _dio.get(
+      '/me/workshop-records',
+      queryParameters: {'status': status},
+    );
+  }
+
+  Future<Response> submitOwnerDecision(
+    int maintenanceId, {
+    required bool link,
+    required bool attachFiles,
+    required bool hideFromPublic,
+  }) async {
+    return await _dio.post(
+      '/maintenances/$maintenanceId/owner-decision',
+      data: {
+        'link': link,
+        'attach_files': attachFiles,
+        'hide_from_public': hideFromPublic,
+      },
+    );
+  }
+
+  /// Busca por chassi (17 caracteres). Só oficinas.
+  Future<Response> lookupWorkshopVehicle(String chassis) async {
+    return await _dio.get(
+      '/workshop/vehicles/lookup',
+      queryParameters: {'chassis': chassis},
+    );
+  }
+
+  /// Cria o carro só com chassi, marca, modelo e ano. 409 se o chassi existe.
+  Future<Response> createWorkshopVehicle({
+    required String chassis,
+    required String brand,
+    required String model,
+    required int year,
+  }) async {
+    return await _dio.post(
+      '/workshop/vehicles',
+      data: {
+        'chassis': chassis,
+        'brand': brand,
+        'model': model,
+        'year': year,
+      },
+    );
+  }
+
+  Future<Response> sendEmailInvite(int maintenanceId, String email) async {
+    return await _dio.post(
+      '/maintenances/$maintenanceId/invites/email',
+      data: {'email': email},
+    );
+  }
+
+  Future<Response> sendWhatsappInvite(int maintenanceId, String phone) async {
+    return await _dio.post(
+      '/maintenances/$maintenanceId/invites/whatsapp',
+      data: {'phone': phone},
+    );
+  }
+
   // Profile endpoints
   Future<Response> updateProfile(Map<String, dynamic> data) async {
     return await _dio.put('/me', data: data);

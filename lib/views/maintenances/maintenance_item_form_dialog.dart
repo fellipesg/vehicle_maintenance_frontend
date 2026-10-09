@@ -6,9 +6,11 @@ class MaintenanceItemFormDialog extends StatefulWidget {
   final MaintenanceItem? item;
   final List<WarrantyTemplate> itemWarrantyTemplates;
   final bool showWarrantyTemplates;
+  final String? descriptionHelper;
 
   const MaintenanceItemFormDialog({
     super.key,
+    this.descriptionHelper,
     this.item,
     this.itemWarrantyTemplates = const [],
     this.showWarrantyTemplates = false,
@@ -107,9 +109,11 @@ class _MaintenanceItemFormDialogState extends State<MaintenanceItemFormDialog> {
               const SizedBox(height: 16),
               TextFormField(
                 controller: _descriptionController,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: 'Descrição',
-                  border: OutlineInputBorder(),
+                  border: const OutlineInputBorder(),
+                  helperText: widget.descriptionHelper,
+                  helperMaxLines: 2,
                 ),
                 maxLines: 2,
               ),
