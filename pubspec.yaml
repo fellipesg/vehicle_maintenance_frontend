@@ -1,7 +1,7 @@
 name: vehicle_maintenance
 description: Aplicativo mobile para registro de manutenções de veículos
 publish_to: 'none'
-version: 1.1.0+5
+version: 1.1.1+6
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
