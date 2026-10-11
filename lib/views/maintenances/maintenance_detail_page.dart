@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:open_filex/open_filex.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
@@ -12,6 +13,7 @@ import '../../models/maintenance_item.dart';
 import '../../models/maintenance_warranty.dart';
 import '../../models/invoice.dart';
 import '../../models/vehicle.dart';
+import '../../services/api_error.dart';
 import '../../services/api_service.dart';
 import '../../services/auth_service.dart';
 import '../../theme/app_theme.dart';
@@ -33,10 +35,37 @@ class _MaintenanceDetailPageState extends State<MaintenanceDetailPage> {
   Maintenance? _maintenance;
   Vehicle? _vehicle;
   bool _isLoading = true;
+  bool _isAttachingInvoice = false;
 
   bool get _isWorkshopPortal {
     final auth = Provider.of<AuthService>(context, listen: false);
     return auth.isWorkshopUser;
+  }
+
+  bool get _hasInvoices => _maintenance?.invoices?.isNotEmpty ?? false;
+
+  /// Espelha MaintenancePolicy::canChange, que é o que o upload de nota exige
+  /// (`Gate::authorize('update', $maintenance)`): a oficina só mexe na OS que
+  /// ela mesma selou, e as demais contas só em registro não selado. Sem isso o
+  /// botão apareceria para o proprietário numa OS de oficina e daria 403.
+  bool get _canAttachInvoice {
+    final maintenance = _maintenance;
+
+    if (maintenance == null) {
+      return false;
+    }
+
+    final auth = Provider.of<AuthService>(context, listen: false);
+
+    if (auth.isWorkshopUser) {
+      final sealedBy = maintenance.verifiedWorkshop?.id ?? maintenance.workshopId;
+
+      return maintenance.isVerified &&
+          sealedBy != null &&
+          sealedBy == auth.workshopId;
+    }
+
+    return !maintenance.isVerified;
   }
 
   String get _entityLabel =>
@@ -92,6 +121,63 @@ class _MaintenanceDetailPageState extends State<MaintenanceDetailPage> {
       }
     } catch (_) {
       // Cover photo fallback handled by widget.
+    }
+  }
+
+  Future<void> _attachInvoice() async {
+    final maintenanceId = _maintenance?.id;
+
+    if (maintenanceId == null || _isAttachingInvoice) {
+      return;
+    }
+
+    // O backend aceita só PDF e XML (App\Rules\InvoiceFile); filtrar aqui evita
+    // uma viagem até o 422.
+    final picked = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: const ['pdf', 'xml'],
+    );
+
+    final path = picked?.files.single.path;
+
+    if (path == null || !mounted) {
+      return;
+    }
+
+    setState(() => _isAttachingInvoice = true);
+
+    try {
+      final apiService = Provider.of<ApiService>(context, listen: false);
+      await apiService.uploadInvoice(
+        maintenanceId: maintenanceId,
+        filePath: path,
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Nota fiscal anexada.'),
+          backgroundColor: Colors.green,
+        ),
+      );
+
+      await _loadMaintenance();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(apiErrorMessage(e, fallback: 'Erro ao anexar a nota')),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isAttachingInvoice = false);
+      }
     }
   }
 
@@ -375,8 +461,9 @@ class _MaintenanceDetailPageState extends State<MaintenanceDetailPage> {
                       ),
                     ),
                   ],
-                  if (_maintenance!.invoices != null &&
-                      _maintenance!.invoices!.isNotEmpty) ...[
+                  // O card aparece também sem nota, senão não haveria onde
+                  // anexar — era por isso que a nota esquecida ficava perdida.
+                  if (_hasInvoices || _canAttachInvoice) ...[
                     const SizedBox(height: 16),
                     Card(
                       child: Column(
@@ -394,8 +481,14 @@ class _MaintenanceDetailPageState extends State<MaintenanceDetailPage> {
                                   ),
                             ),
                           ),
+                          if (!_hasInvoices)
+                            const Padding(
+                              padding:
+                                  EdgeInsets.fromLTRB(16, 0, 16, 16),
+                              child: Text('Nenhuma nota anexada.'),
+                            ),
                           const Divider(height: 1),
-                          ..._maintenance!.invoices!.map((Invoice invoice) {
+                          ...?_maintenance!.invoices?.map((Invoice invoice) {
                             return ListTile(
                               leading: const Icon(Icons.picture_as_pdf,
                                   color: Colors.red),
@@ -425,6 +518,29 @@ class _MaintenanceDetailPageState extends State<MaintenanceDetailPage> {
                               onTap: () => _viewInvoice(invoice),
                             );
                           }),
+                          if (_canAttachInvoice)
+                            Padding(
+                              padding: const EdgeInsets.all(8),
+                              child: TextButton.icon(
+                                key: const Key('attach_invoice_button'),
+                                onPressed:
+                                    _isAttachingInvoice ? null : _attachInvoice,
+                                icon: _isAttachingInvoice
+                                    ? const SizedBox(
+                                        width: 18,
+                                        height: 18,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                        ),
+                                      )
+                                    : const Icon(Icons.attach_file),
+                                label: Text(
+                                  _isAttachingInvoice
+                                      ? 'Anexando...'
+                                      : 'Anexar nota fiscal (PDF ou XML)',
+                                ),
+                              ),
+                            ),
                         ],
                       ),
                     ),
