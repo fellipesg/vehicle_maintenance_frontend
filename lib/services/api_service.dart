@@ -293,6 +293,33 @@ class ApiService {
   }
 
   // Invoice endpoints
+
+  /// Anexa uma nota a uma manutenção já criada. Até aqui a nota só entrava no
+  /// momento de registrar o serviço: quem esquecesse não tinha como voltar.
+  ///
+  /// `invoice_type` é `general` — nota da OS inteira. O vínculo com um item
+  /// específico (`item` + `maintenance_item_id`) existe na API, mas o app ainda
+  /// não tem onde escolher o item.
+  Future<Response> uploadInvoice({
+    required int maintenanceId,
+    required String filePath,
+  }) async {
+    final formData = FormData.fromMap({
+      'maintenance_id': maintenanceId,
+      'invoice_type': 'general',
+      'file': await MultipartFile.fromFile(
+        filePath,
+        filename: filePath.split('/').last,
+      ),
+    });
+
+    return await _dio.post(
+      '/invoices/upload',
+      data: formData,
+      options: Options(contentType: 'multipart/form-data'),
+    );
+  }
+
   Future<Response> downloadInvoice(String id) async {
     return await _dio.get(
       '/invoices/$id/download',
