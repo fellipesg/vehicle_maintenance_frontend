@@ -93,7 +93,7 @@ void main() {
     await tester.tap(find.text('Atualizar'));
     await tester.pumpAndSettle();
 
-    expect(find.text('RENAVAM deve ter 11 dígitos'), findsNothing);
+    expect(find.text('RENAVAM deve ter de 9 a 11 dígitos'), findsNothing);
     expect(apiService.lastUpdatePayload?['renavam'], '1234567890');
   });
 

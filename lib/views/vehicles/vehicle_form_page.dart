@@ -245,9 +245,9 @@ class _VehicleFormPageState extends State<VehicleFormPage> {
   }
 
   /// O backend exige RENAVAM nos dois casos, e o campo não tinha validator — dava
-  /// para salvar vazio e receber um 422. No cadastro exige 11 dígitos, como o
-  /// portal web (`digits:11`); na edição só exige não-vazio, porque a API aceitou
-  /// `max:20` por um tempo e enforcar 11 dígitos travaria esses valores antigos.
+  /// para salvar vazio e receber um 422. No cadastro exige 9 a 11 dígitos (carros antigos têm 9), como o
+  /// portal web; na edição só exige não-vazio, porque a API aceitou
+  /// `max:20` por um tempo e enforcar o formato travaria esses valores antigos.
   String? _validateRenavam(String? value) {
     final renavam = value?.trim() ?? '';
 
@@ -255,8 +255,8 @@ class _VehicleFormPageState extends State<VehicleFormPage> {
       return 'RENAVAM é obrigatório';
     }
 
-    if (widget.vehicle == null && !RegExp(r'^\d{11}$').hasMatch(renavam)) {
-      return 'RENAVAM deve ter 11 dígitos';
+    if (widget.vehicle == null && !RegExp(r'^\d{9,11}$').hasMatch(renavam)) {
+      return 'RENAVAM deve ter de 9 a 11 dígitos';
     }
 
     return null;

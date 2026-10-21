@@ -64,8 +64,8 @@ class _VehicleLinkPageState extends State<VehicleLinkPage> {
     if (renavam.isEmpty) {
       return 'Informe o RENAVAM do documento';
     }
-    if (!RegExp(r'^\d{11}$').hasMatch(renavam)) {
-      return 'RENAVAM deve ter 11 dígitos';
+    if (!RegExp(r'^\d{9,11}$').hasMatch(renavam)) {
+      return 'RENAVAM deve ter de 9 a 11 dígitos';
     }
 
     return null;
