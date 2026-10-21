@@ -134,7 +134,7 @@ void main() {
     expect(api.searchedIdentifier, isNull);
   });
 
-  testWidgets('rejects a RENAVAM that is not 11 digits', (tester) async {
+  testWidgets('rejects a RENAVAM outside 9 to 11 digits', (tester) async {
     final api = _FakeApiService();
     await tester.pumpWidget(_wrap(api));
 
@@ -142,8 +142,42 @@ void main() {
     await tester.tap(find.byKey(const Key('link_search_button')));
     await tester.pump();
 
-    expect(find.text('RENAVAM deve ter 11 dígitos'), findsOneWidget);
+    expect(find.text('RENAVAM deve ter de 9 a 11 dígitos'), findsOneWidget);
     expect(api.searchedIdentifier, isNull);
+  });
+
+  testWidgets('rejects RENAVAM of 8 digits and accepts 9, 10 and 11',
+      (tester) async {
+    for (final entry in {
+      '12345678': false,
+      '123456789': true,
+      '1234567890': true,
+      '12345678901': true,
+    }.entries) {
+      final api = _FakeApiService();
+      await tester.pumpWidget(_wrap(api));
+
+      await _fillDocument(tester, renavam: entry.key);
+      await tester.tap(find.byKey(const Key('link_search_button')));
+      await tester.pump();
+
+      expect(
+        find.text('RENAVAM deve ter de 9 a 11 dígitos'),
+        entry.value ? findsNothing : findsOneWidget,
+        reason: entry.key,
+      );
+    }
+  });
+
+  testWidgets('limits RENAVAM input to 11 digits', (tester) async {
+    await tester.pumpWidget(_wrap(_FakeApiService()));
+
+    await _fillDocument(tester, renavam: '123456789012');
+
+    final field = tester.widget<TextFormField>(
+      find.byKey(const Key('link_renavam_field')),
+    );
+    expect(field.controller!.text, '12345678901');
   });
 
   testWidgets('shows the vehicle found, without echoing the proof fields',
