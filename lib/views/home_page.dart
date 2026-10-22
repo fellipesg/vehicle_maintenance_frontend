@@ -18,6 +18,7 @@ import 'vehicles/vehicle_form_page.dart';
 import 'vehicles/vehicle_link_page.dart';
 import 'vehicles/vehicle_detail_page.dart';
 import 'workshop_vehicles/workshop_chassis_page.dart';
+import '../widgets/export_photos_prompt.dart';
 import '../widgets/load_more_button.dart';
 
 class HomePage extends StatefulWidget {
@@ -43,6 +44,7 @@ class _HomePageState extends State<HomePage> {
       if (mounted) {
         context.read<NotificationInbox>().refreshUnreadCount();
         _refreshWorkshopRecords();
+        ExportPhotosPrompt.maybeAsk(context);
       }
     });
   }

@@ -145,4 +145,66 @@ void main() {
 
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('última página pergunta das fotos no PDF e guarda a resposta',
+      (tester) async {
+    await tester.pumpWidget(_app(authenticated: false));
+    await tester.pumpAndSettle();
+
+    // Nas páginas anteriores a pergunta não aparece.
+    expect(find.byKey(const Key('onboarding_export_photos')), findsNothing);
+
+    await _goToLastPage(tester);
+
+    expect(
+      find.text('Incluir as fotos das manutenções no PDF do histórico?'),
+      findsOneWidget,
+    );
+    expect(
+        find.textContaining('compartilhado com compradores'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('onboarding_export_yes')));
+    await tester.pumpAndSettle();
+
+    expect(await const OnboardingStorage().readExportPhotosAnswer(), isTrue);
+    expect(
+      tester
+          .widget<ChoiceChip>(find.byKey(const Key('onboarding_export_yes')))
+          .selected,
+      isTrue,
+    );
+
+    await tester.tap(find.byKey(const Key('onboarding_export_no')));
+    await tester.pumpAndSettle();
+
+    expect(await const OnboardingStorage().readExportPhotosAnswer(), isFalse);
+  });
+
+  testWidgets('a pergunta é opcional: seguir sem responder não guarda nada',
+      (tester) async {
+    await tester.pumpWidget(_app(authenticated: false));
+    await tester.pumpAndSettle();
+    await _goToLastPage(tester);
+
+    await tester.tap(find.byKey(const Key('onboarding_login')));
+    await tester.pumpAndSettle();
+
+    expect(await const OnboardingStorage().readExportPhotosAnswer(), isNull);
+  });
+
+  testWidgets('resposta anterior volta marcada ao reabrir', (tester) async {
+    SharedPreferences.setMockInitialValues({
+      OnboardingStorage.exportPhotosAnswerKey: false,
+    });
+    await tester.pumpWidget(_app(authenticated: false));
+    await tester.pumpAndSettle();
+    await _goToLastPage(tester);
+
+    expect(
+      tester
+          .widget<ChoiceChip>(find.byKey(const Key('onboarding_export_no')))
+          .selected,
+      isTrue,
+    );
+  });
 }

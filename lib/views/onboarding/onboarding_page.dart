@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../services/onboarding_storage.dart';
+import '../../widgets/export_photos_prompt.dart';
 import '../../theme/provenance.dart';
 import '../../widgets/revisalog_lockup.dart';
 import '../auth/login_hub_page.dart';
@@ -13,6 +14,7 @@ class _OnboardingSlide {
     required this.body,
     this.footnote,
     this.showProvenance = false,
+    this.asksExportPhotos = false,
   });
 
   final IconData icon;
@@ -20,6 +22,9 @@ class _OnboardingSlide {
   final String body;
   final String? footnote;
   final bool showProvenance;
+
+  /// Mostra a pergunta "incluir as fotos no PDF?" (Sim/Não).
+  final bool asksExportPhotos;
 }
 
 const List<_OnboardingSlide> _slides = [
@@ -42,6 +47,7 @@ const List<_OnboardingSlide> _slides = [
     body: 'Exporte o PDF com a linha do tempo, a quilometragem e as notas '
         'fiscais.',
     footnote: 'Grátis no lançamento.',
+    asksExportPhotos: true,
   ),
 ];
 
@@ -66,6 +72,26 @@ class OnboardingPage extends StatefulWidget {
 class _OnboardingPageState extends State<OnboardingPage> {
   final PageController _controller = PageController();
   int _index = 0;
+
+  /// Resposta à pergunta das fotos no PDF. Ainda não há conta para gravar o
+  /// `PUT /me`, então fica no aparelho e é aplicada depois do login (ver
+  /// [ExportPhotosPrompt]).
+  bool? _exportAnswer;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.storage.readExportPhotosAnswer().then((value) {
+      if (mounted && value != null) {
+        setState(() => _exportAnswer = value);
+      }
+    });
+  }
+
+  void _answerExportPhotos(bool value) {
+    setState(() => _exportAnswer = value);
+    widget.storage.saveExportPhotosAnswer(value);
+  }
 
   bool get _isLast => _index == _slides.length - 1;
 
@@ -142,6 +168,8 @@ class _OnboardingPageState extends State<OnboardingPage> {
                   slide: _slides[i],
                   position: i + 1,
                   total: _slides.length,
+                  exportAnswer: _exportAnswer,
+                  onExportAnswer: _answerExportPhotos,
                 ),
               ),
             ),
@@ -208,11 +236,15 @@ class _SlideView extends StatelessWidget {
     required this.slide,
     required this.position,
     required this.total,
+    required this.exportAnswer,
+    required this.onExportAnswer,
   });
 
   final _OnboardingSlide slide;
   final int position;
   final int total;
+  final bool? exportAnswer;
+  final ValueChanged<bool> onExportAnswer;
 
   @override
   Widget build(BuildContext context) {
@@ -290,12 +322,74 @@ class _SlideView extends StatelessWidget {
                       ),
                     ),
                   ],
+                  if (slide.asksExportPhotos) ...[
+                    const SizedBox(height: 24),
+                    _ExportPhotosQuestion(
+                      answer: exportAnswer,
+                      onAnswer: onExportAnswer,
+                    ),
+                  ],
                 ],
               ),
             ),
           ),
         );
       },
+    );
+  }
+}
+
+class _ExportPhotosQuestion extends StatelessWidget {
+  const _ExportPhotosQuestion({required this.answer, required this.onAnswer});
+
+  final bool? answer;
+  final ValueChanged<bool> onAnswer;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Semantics(
+      container: true,
+      label: exportPhotosQuestion,
+      child: Column(
+        key: const Key('onboarding_export_photos'),
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            exportPhotosQuestion,
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'O PDF pode ser compartilhado com compradores. Você muda isso '
+            'depois em Configurações.',
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            children: [
+              ChoiceChip(
+                key: const Key('onboarding_export_yes'),
+                label: const Text('Sim'),
+                selected: answer == true,
+                onSelected: (_) => onAnswer(true),
+              ),
+              ChoiceChip(
+                key: const Key('onboarding_export_no'),
+                label: const Text('Não'),
+                selected: answer == false,
+                onSelected: (_) => onAnswer(false),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 }
