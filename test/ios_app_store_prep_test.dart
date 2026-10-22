@@ -35,8 +35,10 @@ void main() {
 
     expect(appDelegate, contains('FlutterPluginRegistrant'));
     expect(appDelegate, contains('pluginRegistrant = self'));
-    expect(appDelegate, contains('func register(with registry: FlutterPluginRegistry)'));
-    expect(appDelegate, isNot(contains('GeneratedPluginRegistrant.register(with: self)')));
+    expect(appDelegate,
+        contains('func register(with registry: FlutterPluginRegistry)'));
+    expect(appDelegate,
+        isNot(contains('GeneratedPluginRegistrant.register(with: self)')));
   });
 
   test('iOS privacy manifest and push entitlements are present', () {
@@ -75,5 +77,22 @@ void main() {
       File('ios/Runner/Base.lproj/LaunchScreen.storyboard').readAsStringSync(),
       contains('0.0431372549'),
     );
+  });
+
+  test('iOS permission texts describe camera and photo uses in pt-BR', () {
+    final plist = File('ios/Runner/Info.plist').readAsStringSync();
+
+    for (final key in [
+      'NSCameraUsageDescription',
+      'NSPhotoLibraryUsageDescription',
+      'NSPhotoLibraryAddUsageDescription',
+    ]) {
+      final match = RegExp('<key>$key</key>\\s*<string>([^<]*)</string>')
+          .firstMatch(plist);
+
+      expect(match, isNotNull, reason: key);
+      expect(match!.group(1), contains('manutenç'), reason: key);
+      expect(match.group(1), contains('capa do veículo'), reason: key);
+    }
   });
 }
