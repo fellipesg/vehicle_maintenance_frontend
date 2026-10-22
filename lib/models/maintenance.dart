@@ -1,6 +1,7 @@
 import 'maintenance_item.dart';
 import 'maintenance_warranty.dart';
 import 'invoice.dart';
+import 'maintenance_photo.dart';
 import 'workshop.dart';
 
 class Maintenance {
@@ -30,6 +31,14 @@ class Maintenance {
   final Workshop? workshop;
   final MaintenanceWarranty? generalWarranty;
   final String? ownerName;
+
+  /// Fotos que o usuário pode ver. Vazio quando [photosLocked].
+  final List<MaintenancePhoto> photos;
+  final int photosCount;
+
+  /// Existem fotos, mas o usuário ainda não pode vê-las (OS sem proprietário
+  /// aguardando o aceite dele).
+  final bool photosLocked;
 
   /// OS feita por oficina em carro sem dono (sem conta no RevisaLog).
   final bool isOwnerlessRecord;
@@ -70,13 +79,16 @@ class Maintenance {
     this.workshop,
     this.generalWarranty,
     this.ownerName,
+    this.photos = const [],
+    int? photosCount,
+    this.photosLocked = false,
     this.isOwnerlessRecord = false,
     this.ownerStatus,
     this.attachmentsStatus,
     this.hiddenFromPublic = false,
     this.whatsappInvitedAt,
     this.emailInvitedAt,
-  });
+  }) : photosCount = photosCount ?? photos.length;
 
   bool get hasInvoices => (invoices?.isNotEmpty ?? false);
 
@@ -147,6 +159,9 @@ class Maintenance {
           ? MaintenanceWarranty.fromJson(generalWarrantyJson)
           : null,
       ownerName: json['user'] is Map ? json['user']['name']?.toString() : null,
+      photos: parsePhotos(json['photos']),
+      photosCount: int.tryParse('${json['photos_count'] ?? ''}'),
+      photosLocked: json['photos_locked'] == true,
       isOwnerlessRecord: json['is_ownerless_record'] == true,
       ownerStatus: json['owner_status']?.toString(),
       attachmentsStatus: json['attachments_status']?.toString(),
@@ -158,6 +173,19 @@ class Maintenance {
           ? DateTime.tryParse(json['email_invited_at'].toString())
           : null,
     );
+  }
+
+  /// Lê `photos` do detalhe da manutenção (ou `photo_preview` da timeline).
+  static List<MaintenancePhoto> parsePhotos(Object? raw) {
+    if (raw is! List) {
+      return const [];
+    }
+
+    return raw
+        .whereType<Map>()
+        .map((photo) =>
+            MaintenancePhoto.fromJson(Map<String, dynamic>.from(photo)))
+        .toList();
   }
 
   Map<String, dynamic> toJson() {

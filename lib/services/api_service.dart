@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 
+import '../models/maintenance_photo.dart';
 import '../models/vehicle_lookup_result.dart';
 
 /// Chamado quando o backend recusa o Bearer token (401) de uma rota autenticada.
@@ -333,6 +334,53 @@ class ApiService {
     return await _dio.delete('/invoices/$id');
   }
 
+  // Maintenance photo endpoints
+
+  /// Envia uma foto de antes/durante/depois. Campos do multipart (ver
+  /// `StoreMaintenancePhotoRequest`): `photo` (jpg/jpeg/png/webp, até 5 MB),
+  /// `subject` (`vehicle|part`), `stage` (`before|during|after`) e
+  /// `maintenance_item_id` opcional. O backend aceita no máximo 4 fotos por
+  /// grupo (assunto + momento) e responde 422 com a mensagem quando passa.
+  Future<Response> uploadMaintenancePhoto({
+    required int maintenanceId,
+    required String filePath,
+    required PhotoSubject subject,
+    required PhotoStage stage,
+    int? maintenanceItemId,
+    void Function(int sent, int total)? onSendProgress,
+    CancelToken? cancelToken,
+  }) async {
+    final formData = FormData.fromMap({
+      'subject': subject.apiValue,
+      'stage': stage.apiValue,
+      if (maintenanceItemId != null) 'maintenance_item_id': maintenanceItemId,
+      'photo': await MultipartFile.fromFile(
+        filePath,
+        filename: filePath.split('/').last,
+      ),
+    });
+
+    return await _dio.post(
+      '/maintenances/$maintenanceId/photos',
+      data: formData,
+      options: Options(
+        contentType: 'multipart/form-data',
+        // Uploads de câmera em rede móvel passam fácil dos 30 s do padrão.
+        sendTimeout: const Duration(minutes: 2),
+        receiveTimeout: const Duration(minutes: 2),
+      ),
+      onSendProgress: onSendProgress,
+      cancelToken: cancelToken,
+    );
+  }
+
+  Future<Response> deleteMaintenancePhoto({
+    required int maintenanceId,
+    required int photoId,
+  }) async {
+    return await _dio.delete('/maintenances/$maintenanceId/photos/$photoId');
+  }
+
   // Workshop endpoints
   Future<Response> getWorkshops({
     Map<String, dynamic>? queryParams,
@@ -462,6 +510,12 @@ class ApiService {
   // Profile endpoints
   Future<Response> updateProfile(Map<String, dynamic> data) async {
     return await _dio.put('/me', data: data);
+  }
+
+  /// Preferência de incluir as fotos das manutenções no PDF do histórico.
+  /// Manda só este campo: `PUT /me` valida tudo como `sometimes`/`nullable`.
+  Future<Response> updateExportIncludePhotos(bool value) async {
+    return await _dio.put('/me', data: {'export_include_photos': value});
   }
 
   Future<Response> deleteAccount() async {
