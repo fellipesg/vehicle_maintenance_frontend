@@ -46,7 +46,11 @@ void main() {
   });
 
   testWidgets('pergunta quando a conta ainda não respondeu', (tester) async {
-    await _pump(tester, {'user_type': 'user', 'export_include_photos': null});
+    await _pump(tester, {
+      'user_type': 'user',
+      'features': photosFeatureOn,
+      'export_include_photos': null
+    });
 
     expect(find.text(exportPhotosQuestion), findsOneWidget);
     expect(
@@ -56,7 +60,11 @@ void main() {
   testWidgets('Sim grava true via PUT /me', (tester) async {
     final api = await _pump(
       tester,
-      {'user_type': 'user', 'export_include_photos': null},
+      {
+        'user_type': 'user',
+        'features': photosFeatureOn,
+        'export_include_photos': null
+      },
     );
 
     await tester.tap(find.byKey(const Key('export_photos_yes')));
@@ -69,7 +77,11 @@ void main() {
   testWidgets('Não grava false', (tester) async {
     final api = await _pump(
       tester,
-      {'user_type': 'user', 'export_include_photos': null},
+      {
+        'user_type': 'user',
+        'features': photosFeatureOn,
+        'export_include_photos': null
+      },
     );
 
     await tester.tap(find.byKey(const Key('export_photos_no')));
@@ -81,7 +93,11 @@ void main() {
   testWidgets('Agora não dispensa sem gravar', (tester) async {
     final api = await _pump(
       tester,
-      {'user_type': 'user', 'export_include_photos': null},
+      {
+        'user_type': 'user',
+        'features': photosFeatureOn,
+        'export_include_photos': null
+      },
     );
 
     await tester.tap(find.byKey(const Key('export_photos_later')));
@@ -94,7 +110,11 @@ void main() {
   testWidgets('não pergunta se já respondeu', (tester) async {
     final api = await _pump(
       tester,
-      {'user_type': 'user', 'export_include_photos': false},
+      {
+        'user_type': 'user',
+        'features': photosFeatureOn,
+        'export_include_photos': false
+      },
     );
 
     expect(find.text(exportPhotosQuestion), findsNothing);
@@ -104,14 +124,18 @@ void main() {
   testWidgets('oficina nunca é perguntada', (tester) async {
     await _pump(
       tester,
-      {'user_type': 'workshop', 'export_include_photos': null},
+      {
+        'user_type': 'workshop',
+        'features': photosFeatureOn,
+        'export_include_photos': null
+      },
     );
 
     expect(find.text(exportPhotosQuestion), findsNothing);
   });
 
   testWidgets('backend sem o campo: não pergunta', (tester) async {
-    await _pump(tester, {'user_type': 'user'});
+    await _pump(tester, {'user_type': 'user', 'features': photosFeatureOn});
 
     expect(find.text(exportPhotosQuestion), findsNothing);
   });
@@ -124,7 +148,11 @@ void main() {
 
     final api = await _pump(
       tester,
-      {'user_type': 'user', 'export_include_photos': null},
+      {
+        'user_type': 'user',
+        'features': photosFeatureOn,
+        'export_include_photos': null
+      },
     );
 
     expect(find.text(exportPhotosQuestion), findsNothing);
@@ -137,7 +165,11 @@ void main() {
     await tester.pumpWidget(
       providers(
         api,
-        FakeAuth(api, {'user_type': 'user', 'export_include_photos': null}),
+        FakeAuth(api, {
+          'user_type': 'user',
+          'features': photosFeatureOn,
+          'export_include_photos': null
+        }),
         child: const _Host(),
       ),
     );
@@ -148,4 +180,28 @@ void main() {
 
     expect(find.textContaining('O servidor falhou'), findsOneWidget);
   });
+
+  for (final features in <Map<String, dynamic>?>[
+    null,
+    const {},
+    const {'maintenance_photos': false},
+  ]) {
+    testWidgets(
+        'recurso desligado ($features): não pergunta e descarta '
+        'a resposta do onboarding', (tester) async {
+      SharedPreferences.setMockInitialValues({
+        OnboardingStorage.exportPhotosAnswerKey: true,
+      });
+
+      final api = await _pump(tester, {
+        'user_type': 'user',
+        if (features != null) 'features': features,
+        'export_include_photos': null,
+      });
+
+      expect(find.text(exportPhotosQuestion), findsNothing);
+      expect(api.exportPreferenceWrites, isEmpty);
+      expect(await const OnboardingStorage().readExportPhotosAnswer(), isNull);
+    });
+  }
 }

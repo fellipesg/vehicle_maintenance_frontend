@@ -125,6 +125,21 @@ class FakeAuth extends AuthService {
   Future<void> saveUser(Map<String, dynamic> user) async {
     _user = Map.of(user);
   }
+
+  int refreshCount = 0;
+
+  /// Relê o `/me` da API de teste; um `/me` vazio mantém o usuário atual.
+  @override
+  Future<Map<String, dynamic>?> getCurrentUser() async {
+    refreshCount++;
+    final response = await apiService.getMe();
+    final data = response.data['data'];
+    if (data is Map && data.isNotEmpty) {
+      await saveUser(Map<String, dynamic>.from(data));
+    }
+
+    return _user;
+  }
 }
 
 class FakePicker extends MaintenancePhotoPicker {
@@ -285,3 +300,6 @@ Widget providers(
     child: MaterialApp(home: child),
   );
 }
+
+/// `features` do usuário (`/me`) com o recurso de fotos liberado.
+const Map<String, dynamic> photosFeatureOn = {'maintenance_photos': true};

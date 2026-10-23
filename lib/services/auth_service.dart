@@ -10,6 +10,7 @@ import 'api_error.dart';
 import 'api_service.dart';
 import 'auth_token_storage.dart';
 import 'fcm_service.dart';
+import 'maintenance_photos_feature.dart';
 
 class AuthService {
   final ApiService _apiService;
@@ -40,6 +41,9 @@ class AuthService {
   bool get isWorkshopUser => user?['user_type'] == 'workshop';
 
   bool get isAdmin => user?['is_admin'] == true;
+
+  /// Fotos das manutenções liberadas para esta conta (`features` do `/me`).
+  bool get hasMaintenancePhotos => MaintenancePhotosFeature.isEnabledFor(user);
 
   bool get hasTwoFactorEnabled => user?['has_two_factor_enabled'] == true;
 

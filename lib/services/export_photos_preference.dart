@@ -12,8 +12,9 @@ class ExportPhotosPreference {
   static const String field = 'export_include_photos';
 
   /// A pergunta só faz sentido para quem exporta o histórico (não oficina).
+  /// Sem o recurso de fotos na conta, não há o que incluir no PDF.
   static bool appliesTo(AuthService auth) =>
-      auth.isAuthenticated && !auth.isWorkshopUser;
+      auth.isAuthenticated && !auth.isWorkshopUser && auth.hasMaintenancePhotos;
 
   /// Valor atual. `supported` é falso quando nem o usuário em cache nem o
   /// `GET /me` trazem o campo (backend sem a funcionalidade ou sem rede): nesse

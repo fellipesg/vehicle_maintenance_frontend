@@ -18,6 +18,7 @@ import '../../services/api_error.dart';
 import '../../services/api_service.dart';
 import '../../services/auth_service.dart';
 import '../../services/maintenance_photo_picker.dart';
+import '../../services/maintenance_photos_feature.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/photos/maintenance_photos_section.dart';
 import '../../widgets/provenance/provenance_seal.dart';
@@ -510,10 +511,11 @@ class _MaintenanceDetailPageState extends State<MaintenanceDetailPage> {
                       ),
                     ),
                   ],
-                  if (MaintenancePhotosSection.shouldShow(
-                    _maintenance!,
-                    canManage: _canManagePhotos,
-                  )) ...[
+                  if (MaintenancePhotosFeature.of(context) &&
+                      MaintenancePhotosSection.shouldShow(
+                        _maintenance!,
+                        canManage: _canManagePhotos,
+                      )) ...[
                     const SizedBox(height: 16),
                     MaintenancePhotosSection(
                       maintenance: _maintenance!,

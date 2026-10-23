@@ -29,9 +29,18 @@ Map<String, dynamic> _timeline(Map<String, dynamic> maintenanceEvent) => {
       ],
     };
 
-Widget _app(FakePhotosApi api, Map<String, dynamic> timeline) {
-  return Provider<ApiService>.value(
-    value: api,
+Widget _app(
+  FakePhotosApi api,
+  Map<String, dynamic> timeline, {
+  Map<String, dynamic> features = photosFeatureOn,
+}) {
+  return MultiProvider(
+    providers: [
+      Provider<ApiService>.value(value: api),
+      Provider<AuthService>.value(
+        value: FakeAuth(api, {'user_type': 'user', 'features': features}),
+      ),
+    ],
     child: MaterialApp(
       home: Scaffold(
         body: SingleChildScrollView(
@@ -121,6 +130,34 @@ void main() {
     expect(find.byKey(const Key('timeline_photo_strip')), findsNothing);
   });
 
+  testWidgets('recurso desligado: nem fotos nem cadeado na timeline',
+      (tester) async {
+    final api = FakePhotosApi();
+    final event = _timeline({
+      'photos_count': 2,
+      'photo_preview': [
+        photoJson(id: 1, stage: 'before'),
+        photoJson(id: 2, stage: 'after'),
+      ],
+    });
+
+    await tester.pumpWidget(
+      _app(api, event, features: const {'maintenance_photos': false}),
+    );
+
+    expect(find.textContaining('Revisão'), findsOneWidget);
+    expect(find.byKey(const Key('timeline_photo_strip')), findsNothing);
+
+    final locked = _timeline({
+      'photos_count': 3,
+      'photos_locked': true,
+      'photo_preview': <Map<String, dynamic>>[],
+    });
+    await tester.pumpWidget(_app(api, locked, features: const {}));
+
+    expect(find.byKey(const Key('timeline_photos_locked')), findsNothing);
+  });
+
   testWidgets('sem fotos não ocupa espaço', (tester) async {
     final api = FakePhotosApi();
     await tester.pumpWidget(
@@ -149,7 +186,8 @@ void main() {
         providers: [
           Provider<ApiService>.value(value: api),
           Provider<AuthService>.value(
-            value: FakeAuth(api, const {'user_type': 'user'}),
+            value: FakeAuth(
+                api, const {'user_type': 'user', 'features': photosFeatureOn}),
           ),
         ],
         child: MaterialApp(

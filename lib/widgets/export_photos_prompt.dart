@@ -42,6 +42,12 @@ class ExportPhotosPrompt {
     }
 
     if (!ExportPhotosPreference.appliesTo(auth)) {
+      // Conta sem o recurso de fotos: a resposta do onboarding não vale mais.
+      if (auth.isAuthenticated &&
+          !auth.isWorkshopUser &&
+          !auth.hasMaintenancePhotos) {
+        await storage.clearExportPhotosAnswer();
+      }
       return;
     }
 

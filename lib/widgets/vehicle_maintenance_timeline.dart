@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 
 import '../models/maintenance.dart';
 import '../models/provenance_segment.dart';
+import '../services/maintenance_photos_feature.dart';
 import '../theme/app_theme.dart';
 import '../theme/provenance.dart';
 import '../views/maintenances/maintenance_detail_page.dart';
@@ -419,8 +420,9 @@ class _TimelineRow extends StatelessWidget {
             : colorScheme.primary.withValues(alpha: 0.7));
     final maintenance = _maintenanceFromTimelineEvent(event);
     final isMaintenance = maintenance != null;
-    final photoStrip =
-        isMaintenance ? TimelinePhotoStrip.fromEvent(event) : null;
+    final photoStrip = isMaintenance && MaintenancePhotosFeature.of(context)
+        ? TimelinePhotoStrip.fromEvent(event)
+        : null;
 
     return IntrinsicHeight(
       child: Row(

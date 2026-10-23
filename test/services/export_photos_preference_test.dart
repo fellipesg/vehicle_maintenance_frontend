@@ -10,8 +10,11 @@ void main() {
 
   test('usa o valor do usuário em cache sem chamar a rede', () async {
     final api = FakePhotosApi();
-    final auth =
-        FakeAuth(api, {'user_type': 'user', 'export_include_photos': true});
+    final auth = FakeAuth(api, {
+      'user_type': 'user',
+      'features': photosFeatureOn,
+      'export_include_photos': true
+    });
 
     final result = await ExportPhotosPreference.resolve(auth);
 
@@ -22,8 +25,11 @@ void main() {
 
   test('null em cache significa "nunca perguntado"', () async {
     final api = FakePhotosApi();
-    final auth =
-        FakeAuth(api, {'user_type': 'user', 'export_include_photos': null});
+    final auth = FakeAuth(api, {
+      'user_type': 'user',
+      'features': photosFeatureOn,
+      'export_include_photos': null
+    });
 
     final result = await ExportPhotosPreference.resolve(auth);
 
@@ -33,7 +39,8 @@ void main() {
 
   test('sem o campo em cache lê GET /me e guarda no usuário', () async {
     final api = FakePhotosApi(me: {'export_include_photos': false});
-    final auth = FakeAuth(api, {'user_type': 'user'});
+    final auth =
+        FakeAuth(api, {'user_type': 'user', 'features': photosFeatureOn});
 
     final result = await ExportPhotosPreference.resolve(auth);
 
@@ -45,7 +52,8 @@ void main() {
 
   test('backend sem o campo: não suportado', () async {
     final api = FakePhotosApi(me: {'name': 'Ana'});
-    final auth = FakeAuth(api, {'user_type': 'user'});
+    final auth =
+        FakeAuth(api, {'user_type': 'user', 'features': photosFeatureOn});
 
     final result = await ExportPhotosPreference.resolve(auth);
 
@@ -54,8 +62,11 @@ void main() {
 
   test('save grava no servidor e no usuário em cache', () async {
     final api = FakePhotosApi();
-    final auth =
-        FakeAuth(api, {'user_type': 'user', 'export_include_photos': null});
+    final auth = FakeAuth(api, {
+      'user_type': 'user',
+      'features': photosFeatureOn,
+      'export_include_photos': null
+    });
 
     await ExportPhotosPreference.save(auth, true);
 
@@ -67,12 +78,13 @@ void main() {
     final api = FakePhotosApi();
 
     expect(
-      ExportPhotosPreference.appliesTo(
-          FakeAuth(api, {'user_type': 'workshop'})),
+      ExportPhotosPreference.appliesTo(FakeAuth(
+          api, {'user_type': 'workshop', 'features': photosFeatureOn})),
       isFalse,
     );
     expect(
-      ExportPhotosPreference.appliesTo(FakeAuth(api, {'user_type': 'user'})),
+      ExportPhotosPreference.appliesTo(
+          FakeAuth(api, {'user_type': 'user', 'features': photosFeatureOn})),
       isTrue,
     );
   });
