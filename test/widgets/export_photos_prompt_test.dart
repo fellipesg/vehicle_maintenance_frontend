@@ -204,4 +204,45 @@ void main() {
       expect(await const OnboardingStorage().readExportPhotosAnswer(), isNull);
     });
   }
+
+  testWidgets('recurso desligado mas /me falhou: guarda a resposta',
+      (tester) async {
+    SharedPreferences.setMockInitialValues({
+      OnboardingStorage.exportPhotosAnswerKey: true,
+    });
+    final api = FakePhotosApi()..meError = dioError(500, {});
+    await tester.pumpWidget(
+      providers(
+        api,
+        FakeAuth(api, {'user_type': 'user', 'export_include_photos': null}),
+        child: const _Host(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text(exportPhotosQuestion), findsNothing);
+    expect(api.exportPreferenceWrites, isEmpty);
+    expect(await const OnboardingStorage().readExportPhotosAnswer(), isTrue);
+  });
+
+  testWidgets('cache sem a flag mas /me diz que está ligada: não descarta',
+      (tester) async {
+    SharedPreferences.setMockInitialValues({
+      OnboardingStorage.exportPhotosAnswerKey: true,
+    });
+    final api = FakePhotosApi(me: {
+      'user_type': 'user',
+      'features': photosFeatureOn,
+    });
+    await tester.pumpWidget(
+      providers(
+        api,
+        FakeAuth(api, {'user_type': 'user', 'export_include_photos': null}),
+        child: const _Host(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(await const OnboardingStorage().readExportPhotosAnswer(), isTrue);
+  });
 }

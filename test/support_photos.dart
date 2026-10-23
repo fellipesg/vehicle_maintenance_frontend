@@ -167,6 +167,7 @@ class FakePhotosApi extends ApiService {
 
   int getMaintenanceCalls = 0;
   int meCalls = 0;
+  Object? meError;
   final List<bool> exportPreferenceWrites = [];
   Object? exportPreferenceError;
 
@@ -212,6 +213,9 @@ class FakePhotosApi extends ApiService {
   @override
   Future<Response> getMe() async {
     meCalls++;
+    if (meError != null) {
+      throw meError!;
+    }
 
     return Response(
       requestOptions: RequestOptions(path: '/me'),
