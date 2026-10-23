@@ -12,11 +12,14 @@ import '../../models/maintenance.dart';
 import '../../models/maintenance_item.dart';
 import '../../models/maintenance_warranty.dart';
 import '../../models/invoice.dart';
+import '../../models/maintenance_photo.dart';
 import '../../models/vehicle.dart';
 import '../../services/api_error.dart';
 import '../../services/api_service.dart';
 import '../../services/auth_service.dart';
+import '../../services/maintenance_photo_picker.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/photos/maintenance_photos_section.dart';
 import '../../widgets/provenance/provenance_seal.dart';
 import '../../widgets/vehicle_cover_avatar.dart';
 import '../../widgets/workshop_records/customer_invite_card.dart';
@@ -25,7 +28,14 @@ import 'maintenance_form_page.dart';
 class MaintenanceDetailPage extends StatefulWidget {
   final int maintenanceId;
 
-  const MaintenanceDetailPage({super.key, required this.maintenanceId});
+  /// [photoPicker] existe para os testes não abrirem câmera/galeria de verdade.
+  const MaintenanceDetailPage({
+    super.key,
+    required this.maintenanceId,
+    this.photoPicker = const MaintenancePhotoPicker(),
+  });
+
+  final MaintenancePhotoPicker photoPicker;
 
   @override
   State<MaintenanceDetailPage> createState() => _MaintenanceDetailPageState();
@@ -36,6 +46,7 @@ class _MaintenanceDetailPageState extends State<MaintenanceDetailPage> {
   Vehicle? _vehicle;
   bool _isLoading = true;
   bool _isAttachingInvoice = false;
+  Future<void>? _photoRefresh;
 
   bool get _isWorkshopPortal {
     final auth = Provider.of<AuthService>(context, listen: false);
@@ -58,7 +69,8 @@ class _MaintenanceDetailPageState extends State<MaintenanceDetailPage> {
     final auth = Provider.of<AuthService>(context, listen: false);
 
     if (auth.isWorkshopUser) {
-      final sealedBy = maintenance.verifiedWorkshop?.id ?? maintenance.workshopId;
+      final sealedBy =
+          maintenance.verifiedWorkshop?.id ?? maintenance.workshopId;
 
       return maintenance.isVerified &&
           sealedBy != null &&
@@ -66,6 +78,42 @@ class _MaintenanceDetailPageState extends State<MaintenanceDetailPage> {
     }
 
     return !maintenance.isVerified;
+  }
+
+  /// Enviar e excluir foto seguem `MaintenancePolicy::canChange`, a mesma regra
+  /// da nota fiscal.
+  bool get _canManagePhotos => _canAttachInvoice;
+
+  /// Busca de novo a manutenção e devolve a foto com URLs recém-assinadas. As
+  /// variantes valem ~10 min; a imagem que falha pede isto uma vez.
+  Future<MaintenancePhoto?> _refreshPhoto(MaintenancePhoto photo) async {
+    await (_photoRefresh ??= _reloadPhotos().whenComplete(() {
+      _photoRefresh = null;
+    }));
+
+    for (final fresh in _maintenance?.photos ?? const <MaintenancePhoto>[]) {
+      if (fresh.id == photo.id) {
+        return fresh;
+      }
+    }
+
+    return null;
+  }
+
+  Future<void> _reloadPhotos() async {
+    try {
+      final apiService = Provider.of<ApiService>(context, listen: false);
+      final response =
+          await apiService.getMaintenance(widget.maintenanceId.toString());
+
+      if (response.data['success'] == true && mounted) {
+        setState(() {
+          _maintenance = Maintenance.fromJson(response.data['data']);
+        });
+      }
+    } catch (_) {
+      // A imagem fica com o placeholder; não vale incomodar o usuário.
+    }
   }
 
   String get _entityLabel =>
@@ -169,7 +217,8 @@ class _MaintenanceDetailPageState extends State<MaintenanceDetailPage> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(apiErrorMessage(e, fallback: 'Erro ao anexar a nota')),
+            content:
+                Text(apiErrorMessage(e, fallback: 'Erro ao anexar a nota')),
             backgroundColor: Colors.red,
           ),
         );
@@ -461,6 +510,19 @@ class _MaintenanceDetailPageState extends State<MaintenanceDetailPage> {
                       ),
                     ),
                   ],
+                  if (MaintenancePhotosSection.shouldShow(
+                    _maintenance!,
+                    canManage: _canManagePhotos,
+                  )) ...[
+                    const SizedBox(height: 16),
+                    MaintenancePhotosSection(
+                      maintenance: _maintenance!,
+                      canManage: _canManagePhotos,
+                      refresher: _refreshPhoto,
+                      picker: widget.photoPicker,
+                      onChanged: _reloadPhotos,
+                    ),
+                  ],
                   // O card aparece também sem nota, senão não haveria onde
                   // anexar — era por isso que a nota esquecida ficava perdida.
                   if (_hasInvoices || _canAttachInvoice) ...[
@@ -483,8 +545,7 @@ class _MaintenanceDetailPageState extends State<MaintenanceDetailPage> {
                           ),
                           if (!_hasInvoices)
                             const Padding(
-                              padding:
-                                  EdgeInsets.fromLTRB(16, 0, 16, 16),
+                              padding: EdgeInsets.fromLTRB(16, 0, 16, 16),
                               child: Text('Nenhuma nota anexada.'),
                             ),
                           const Divider(height: 1),

@@ -1,8 +1,10 @@
 import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:vehicle_maintenance/models/maintenance_photo.dart';
 import 'package:vehicle_maintenance/services/api_service.dart';
 
 /// Responde no nível do adapter para que o fluxo real do Dio rode — é ele que
@@ -39,6 +41,8 @@ ResponseBody jsonBody(int statusCode, Map<String, dynamic> body) {
 }
 
 void main() {
+  photoApiTests();
+
   group('expired session handling', () {
     late ApiService apiService;
     late FakeHttpAdapter adapter;
@@ -132,7 +136,10 @@ void main() {
   group('updateWorkshop multipart', () {
     test('spoofs PUT over POST so PHP parses the body', () async {
       final adapter = FakeHttpAdapter(
-        (_) => jsonBody(200, {'success': true, 'data': const {'id': 7}}),
+        (_) => jsonBody(200, {
+          'success': true,
+          'data': const {'id': 7}
+        }),
       );
       final apiService = ApiService(baseUrl: 'http://test/api/v1');
       apiService.dio.httpClientAdapter = adapter;
@@ -151,7 +158,10 @@ void main() {
 
     test('does not add _method twice', () async {
       final adapter = FakeHttpAdapter(
-        (_) => jsonBody(200, {'success': true, 'data': const {'id': 7}}),
+        (_) => jsonBody(200, {
+          'success': true,
+          'data': const {'id': 7}
+        }),
       );
       final apiService = ApiService(baseUrl: 'http://test/api/v1');
       apiService.dio.httpClientAdapter = adapter;
@@ -165,6 +175,82 @@ void main() {
         formData.fields.where((field) => field.key == '_method'),
         hasLength(1),
       );
+    });
+  });
+}
+
+void photoApiTests() {
+  group('fotos de manutenção e preferência do PDF', () {
+    late ApiService apiService;
+    late FakeHttpAdapter adapter;
+
+    setUp(() {
+      adapter = FakeHttpAdapter((_) => jsonBody(200, {'success': true}));
+      apiService = ApiService(baseUrl: 'http://test/api/v1');
+      apiService.dio.httpClientAdapter = adapter;
+    });
+
+    test('upload manda multipart com photo, subject, stage e item', () async {
+      final dir = Directory.systemTemp.createTempSync('photo-test');
+      addTearDown(() => dir.deleteSync(recursive: true));
+      final file = File('${dir.path}/frente.jpg')..writeAsBytesSync([1, 2, 3]);
+      final progress = <int>[];
+
+      await apiService.uploadMaintenancePhoto(
+        maintenanceId: 5,
+        filePath: file.path,
+        subject: PhotoSubject.part,
+        stage: PhotoStage.during,
+        maintenanceItemId: 7,
+        onSendProgress: (sent, total) => progress.add(sent),
+      );
+
+      final request = adapter.requests.single;
+      final form = request.data as FormData;
+      final fields = {for (final f in form.fields) f.key: f.value};
+
+      expect(request.method, 'POST');
+      expect(request.path, '/maintenances/5/photos');
+      expect(fields, {
+        'subject': 'part',
+        'stage': 'during',
+        'maintenance_item_id': '7',
+      });
+      expect(form.files.single.key, 'photo');
+      expect(form.files.single.value.filename, 'frente.jpg');
+    });
+
+    test('upload sem item não manda maintenance_item_id', () async {
+      final dir = Directory.systemTemp.createTempSync('photo-test');
+      addTearDown(() => dir.deleteSync(recursive: true));
+      final file = File('${dir.path}/a.jpg')..writeAsBytesSync([1]);
+
+      await apiService.uploadMaintenancePhoto(
+        maintenanceId: 5,
+        filePath: file.path,
+        subject: PhotoSubject.vehicle,
+        stage: PhotoStage.before,
+      );
+
+      final form = adapter.requests.single.data as FormData;
+      expect(form.fields.map((f) => f.key), ['subject', 'stage']);
+    });
+
+    test('delete usa a rota aninhada da manutenção', () async {
+      await apiService.deleteMaintenancePhoto(maintenanceId: 5, photoId: 12);
+
+      expect(adapter.requests.single.method, 'DELETE');
+      expect(adapter.requests.single.path, '/maintenances/5/photos/12');
+    });
+
+    test('preferência do PDF manda só export_include_photos em PUT /me',
+        () async {
+      await apiService.updateExportIncludePhotos(true);
+
+      final request = adapter.requests.single;
+      expect(request.method, 'PUT');
+      expect(request.path, '/me');
+      expect(request.data, {'export_include_photos': true});
     });
   });
 }

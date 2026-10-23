@@ -43,11 +43,11 @@
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSCameraUsageDescription</key>
-	<string>O app precisa acessar a câmera para tirar a foto de perfil.</string>
+	<string>O app usa a câmera para tirar a foto de perfil, a capa do veículo e as fotos de antes e depois das manutenções.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
-	<string>O app precisa salvar fotos na galeria ao escolher a foto de perfil e a capa do veículo.</string>
+	<string>O app salva na galeria as fotos que você tira para o perfil, a capa do veículo e as manutenções.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>O app precisa acessar suas fotos para escolher a foto de perfil e a capa do veículo.</string>
+	<string>O app acessa suas fotos para você escolher a foto de perfil, a capa do veículo e as fotos das manutenções.</string>
 	<key>NSUserNotificationsUsageDescription</key>
 	<string>O app usa notificações para avisar sobre manutenções e avisos da oficina.</string>
 	<key>UIApplicationSupportsIndirectInputEvents</key>

@@ -109,6 +109,14 @@ Map<String, dynamic> _maintenance({
   };
 }
 
+/// A seção de fotos empurrou as notas para baixo; a lista só monta o que está
+/// perto da tela, então os testes usam uma tela alta.
+void _useTallScreen(WidgetTester tester) {
+  tester.view.physicalSize = const Size(800, 4000);
+  tester.view.devicePixelRatio = 1;
+  addTearDown(tester.view.reset);
+}
+
 Widget _wrap(_FakeApiService api, _FakeAuthService auth) {
   return MultiProvider(
     providers: [
@@ -127,6 +135,7 @@ void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
   testWidgets('owner can attach to a declared record', (tester) async {
+    _useTallScreen(tester);
     final api = _FakeApiService(maintenance: _maintenance());
     final auth = _FakeAuthService(api, {'user_type': 'user'});
 
@@ -140,6 +149,7 @@ void main() {
 
   testWidgets('owner cannot attach to a workshop-sealed record',
       (tester) async {
+    _useTallScreen(tester);
     final api = _FakeApiService(
       maintenance: _maintenance(verified: true, workshopId: 9),
     );
@@ -154,6 +164,7 @@ void main() {
   });
 
   testWidgets('workshop can attach to the record it sealed', (tester) async {
+    _useTallScreen(tester);
     final api = _FakeApiService(
       maintenance: _maintenance(verified: true, workshopId: 9),
     );
@@ -170,6 +181,7 @@ void main() {
 
   testWidgets('workshop cannot attach to another workshop record',
       (tester) async {
+    _useTallScreen(tester);
     final api = _FakeApiService(
       maintenance: _maintenance(verified: true, workshopId: 9),
     );
@@ -186,6 +198,7 @@ void main() {
 
   testWidgets('an existing invoice is listed with the attach button',
       (tester) async {
+    _useTallScreen(tester);
     final api = _FakeApiService(
       maintenance: _maintenance(invoices: [
         {

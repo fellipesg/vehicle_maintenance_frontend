@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../services/api_error.dart';
 import '../../services/auth_service.dart';
+import '../../services/export_photos_preference.dart';
 import '../../theme/theme_controller.dart';
 import '../auth/login_hub_page.dart';
 import 'change_password_page.dart';
@@ -16,6 +18,61 @@ class SettingsPage extends StatefulWidget {
 
 class _SettingsPageState extends State<SettingsPage> {
   bool _isDeletingAccount = false;
+
+  /// `null` enquanto carrega ou quando o backend não tem o campo (some a
+  /// seção). Dentro, `value` nulo = nunca respondido, mostrado como desligado.
+  ({bool supported, bool? value})? _exportPhotos;
+  bool _isSavingExportPhotos = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadExportPhotos();
+  }
+
+  Future<void> _loadExportPhotos() async {
+    final auth = Provider.of<AuthService>(context, listen: false);
+
+    if (!ExportPhotosPreference.appliesTo(auth)) {
+      return;
+    }
+
+    final result = await ExportPhotosPreference.resolve(auth);
+    if (mounted) {
+      setState(() => _exportPhotos = result);
+    }
+  }
+
+  Future<void> _setExportPhotos(bool value) async {
+    final previous = _exportPhotos;
+    final auth = Provider.of<AuthService>(context, listen: false);
+    final messenger = ScaffoldMessenger.of(context);
+
+    setState(() {
+      _exportPhotos = (supported: true, value: value);
+      _isSavingExportPhotos = true;
+    });
+
+    try {
+      await ExportPhotosPreference.save(auth, value);
+    } catch (error) {
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            apiErrorMessage(error, fallback: 'Não foi possível salvar.'),
+          ),
+          backgroundColor: Colors.red,
+        ),
+      );
+      if (mounted) {
+        setState(() => _exportPhotos = previous);
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSavingExportPhotos = false);
+      }
+    }
+  }
 
   Future<void> _handleLogout(BuildContext context) async {
     final confirmed = await showDialog<bool>(
@@ -116,7 +173,6 @@ class _SettingsPageState extends State<SettingsPage> {
     }
   }
 
-
   @override
   Widget build(BuildContext context) {
     final themeController = context.watch<ThemeController>();
@@ -160,6 +216,23 @@ class _SettingsPageState extends State<SettingsPage> {
             ),
           ),
           const SizedBox(height: 24),
+          if (_exportPhotos?.supported == true) ...[
+            const _SectionHeader(title: 'Histórico em PDF'),
+            Card(
+              child: SwitchListTile(
+                key: const Key('settings_export_photos'),
+                secondary: const Icon(Icons.photo_library_outlined),
+                title: const Text('Fotos no PDF do histórico'),
+                subtitle: const Text(
+                  'Inclui as fotos de antes e depois das manutenções no PDF '
+                  'que você compartilha com compradores.',
+                ),
+                value: _exportPhotos?.value ?? false,
+                onChanged: _isSavingExportPhotos ? null : _setExportPhotos,
+              ),
+            ),
+            const SizedBox(height: 24),
+          ],
           const _SectionHeader(title: 'Segurança'),
           Card(
             child: Column(

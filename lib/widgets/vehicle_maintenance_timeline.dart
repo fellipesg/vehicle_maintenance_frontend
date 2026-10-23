@@ -6,6 +6,7 @@ import '../models/provenance_segment.dart';
 import '../theme/app_theme.dart';
 import '../theme/provenance.dart';
 import '../views/maintenances/maintenance_detail_page.dart';
+import 'photos/timeline_photo_strip.dart';
 import 'provenance/provenance_marker.dart';
 import 'provenance/provenance_rail.dart';
 import 'provenance/provenance_strip.dart';
@@ -418,6 +419,8 @@ class _TimelineRow extends StatelessWidget {
             : colorScheme.primary.withValues(alpha: 0.7));
     final maintenance = _maintenanceFromTimelineEvent(event);
     final isMaintenance = maintenance != null;
+    final photoStrip =
+        isMaintenance ? TimelinePhotoStrip.fromEvent(event) : null;
 
     return IntrinsicHeight(
       child: Row(
@@ -572,6 +575,7 @@ class _TimelineRow extends StatelessWidget {
                             ],
                           ),
                         ),
+                        if (photoStrip != null) photoStrip,
                         if (isExpanded && !isMaintenance)
                           Padding(
                             padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
