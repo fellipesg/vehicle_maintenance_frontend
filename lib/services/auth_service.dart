@@ -5,6 +5,7 @@ import 'package:dio/dio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/login_result.dart';
+import '../models/profile_address.dart';
 import '../repositories/vehicle_repository.dart';
 import 'api_error.dart';
 import 'api_service.dart';
@@ -39,6 +40,12 @@ class AuthService {
   bool get isAuthenticated => _token != null;
 
   bool get isWorkshopUser => user?['user_type'] == 'workshop';
+
+  bool get isGarageUser => user?['user_type'] == 'garage';
+
+  /// Loja e oficina têm endereço no cadastro da empresa, editado só na web.
+  /// Em "Meus Dados" essas contas não veem nem enviam endereço.
+  bool get isCompanyAccount => isGarageUser || isWorkshopUser;
 
   bool get isAdmin => user?['is_admin'] == true;
 
@@ -444,28 +451,18 @@ class AuthService {
     }
   }
 
+  /// [address] nulo deixa o endereço fora do corpo do PUT, e o que está
+  /// gravado fica como está. É assim que loja e oficina salvam o perfil.
   Future<bool> updateProfile({
     required String name,
     String? phone,
-    String? postalCode,
-    String? street,
-    String? number,
-    String? complement,
-    String? city,
-    String? state,
-    String? country,
+    ProfileAddress? address,
   }) async {
     try {
       final response = await _apiService.updateProfile({
         'name': name,
         'phone': phone,
-        'postal_code': postalCode,
-        'street': street,
-        'number': number,
-        'complement': complement,
-        'city': city,
-        'state': state,
-        'country': country,
+        if (address != null) ...address.toPayload(),
       });
 
       if (response.data['success'] == true) {
