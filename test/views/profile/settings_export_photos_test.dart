@@ -34,7 +34,11 @@ void main() {
   testWidgets('mostra o valor atual e grava ao mudar', (tester) async {
     final api = await _pump(
       tester,
-      {'user_type': 'user', 'export_include_photos': false},
+      {
+        'user_type': 'user',
+        'features': photosFeatureOn,
+        'export_include_photos': false
+      },
     );
 
     expect(find.text('Fotos no PDF do histórico'), findsOneWidget);
@@ -49,7 +53,11 @@ void main() {
   });
 
   testWidgets('nunca respondido aparece desligado', (tester) async {
-    await _pump(tester, {'user_type': 'user', 'export_include_photos': null});
+    await _pump(tester, {
+      'user_type': 'user',
+      'features': photosFeatureOn,
+      'export_include_photos': null
+    });
 
     expect(tester.widget<SwitchListTile>(_switchTile).value, isFalse);
   });
@@ -57,7 +65,7 @@ void main() {
   testWidgets('sem o campo em cache lê de GET /me', (tester) async {
     final api = await _pump(
       tester,
-      {'user_type': 'user'},
+      {'user_type': 'user', 'features': photosFeatureOn},
       me: {'export_include_photos': true},
     );
 
@@ -68,7 +76,11 @@ void main() {
   testWidgets('falha ao salvar volta o interruptor e avisa', (tester) async {
     final api = await _pump(
       tester,
-      {'user_type': 'user', 'export_include_photos': false},
+      {
+        'user_type': 'user',
+        'features': photosFeatureOn,
+        'export_include_photos': false
+      },
     );
     api.exportPreferenceError = dioError(500, {});
 
@@ -83,14 +95,39 @@ void main() {
   testWidgets('oficina não vê o interruptor', (tester) async {
     await _pump(
       tester,
-      {'user_type': 'workshop', 'export_include_photos': null},
+      {
+        'user_type': 'workshop',
+        'features': photosFeatureOn,
+        'export_include_photos': null
+      },
     );
 
     expect(_switchTile, findsNothing);
   });
 
   testWidgets('backend sem o campo: seção oculta', (tester) async {
-    await _pump(tester, {'user_type': 'user'}, me: {'name': 'Ana'});
+    await _pump(tester, {'user_type': 'user', 'features': photosFeatureOn},
+        me: {'name': 'Ana'});
+
+    expect(_switchTile, findsNothing);
+  });
+
+  testWidgets('recurso de fotos desligado: sem interruptor', (tester) async {
+    await _pump(
+      tester,
+      {
+        'user_type': 'user',
+        'features': {'maintenance_photos': false},
+        'export_include_photos': false,
+      },
+    );
+
+    expect(_switchTile, findsNothing);
+    expect(find.text('Fotos no PDF do histórico'), findsNothing);
+  });
+
+  testWidgets('sem a chave features: sem interruptor', (tester) async {
+    await _pump(tester, {'user_type': 'user', 'export_include_photos': false});
 
     expect(_switchTile, findsNothing);
   });

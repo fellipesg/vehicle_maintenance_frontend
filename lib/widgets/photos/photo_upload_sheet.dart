@@ -16,6 +16,7 @@ class PhotoUploadSheet extends StatefulWidget {
     required this.api,
     required this.maintenance,
     required this.onUploaded,
+    this.onFeatureDisabled,
     this.initialStage = PhotoStage.before,
     this.picker = const MaintenancePhotoPicker(),
   });
@@ -27,6 +28,10 @@ class PhotoUploadSheet extends StatefulWidget {
 
   /// Chamado quando ao menos um arquivo subiu, para a tela atualizar a seção.
   final VoidCallback onUploaded;
+
+  /// Chamado quando o envio volta 403 (conta sem o recurso de fotos). A folha
+  /// se fecha em seguida.
+  final VoidCallback? onFeatureDisabled;
 
   @override
   State<PhotoUploadSheet> createState() => _PhotoUploadSheetState();
@@ -108,6 +113,13 @@ class _PhotoUploadSheetState extends State<PhotoUploadSheet> {
 
     if (uploader.hasUploaded) {
       widget.onUploaded();
+    }
+
+    if (uploader.featureDisabled) {
+      widget.onFeatureDisabled?.call();
+      if (mounted) {
+        Navigator.of(context).pop();
+      }
     }
   }
 

@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../services/api_error.dart';
 import '../services/auth_service.dart';
 import '../services/export_photos_preference.dart';
+import '../services/maintenance_photos_feature.dart';
 import '../services/onboarding_storage.dart';
 
 const String exportPhotosQuestion =
@@ -42,6 +43,12 @@ class ExportPhotosPrompt {
     }
 
     if (!ExportPhotosPreference.appliesTo(auth)) {
+      // Conta sem o recurso de fotos: a resposta do onboarding só é
+      // descartada se um /me que deu certo confirmar a flag desligada. Sem
+      // rede, guarda a resposta para a próxima vez.
+      if (auth.isAuthenticated && !auth.isWorkshopUser) {
+        await _discardAnswerIfFeatureConfirmedOff(auth, storage);
+      }
       return;
     }
 
@@ -109,6 +116,25 @@ class ExportPhotosPrompt {
           backgroundColor: Colors.red,
         ),
       );
+    }
+  }
+
+  static Future<void> _discardAnswerIfFeatureConfirmedOff(
+    AuthService auth,
+    OnboardingStorage storage,
+  ) async {
+    try {
+      final response = await auth.apiService.getMe();
+      final data = response.data is Map ? response.data['data'] : null;
+
+      if (data is Map &&
+          !MaintenancePhotosFeature.isEnabledFor(
+            Map<String, dynamic>.from(data),
+          )) {
+        await storage.clearExportPhotosAnswer();
+      }
+    } catch (_) {
+      // /me falhou: não dá para saber, então a resposta fica guardada.
     }
   }
 }

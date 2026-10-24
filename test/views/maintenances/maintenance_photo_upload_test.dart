@@ -18,7 +18,8 @@ Future<(FakePhotosApi, FakePicker)> _open(
   addTearDown(tester.view.reset);
 
   final api = FakePhotosApi(maintenance: maintenance);
-  final auth = FakeAuth(api, const {'user_type': 'user'});
+  final auth =
+      FakeAuth(api, const {'user_type': 'user', 'features': photosFeatureOn});
   final picker = FakePicker(picked);
 
   await tester.pumpWidget(
@@ -239,5 +240,33 @@ void main() {
 
     expect(api.uploads, isEmpty);
     expect(find.byKey(const Key('upload_subject')), findsOneWidget);
+  });
+
+  testWidgets('403: avisa que fotos não estão habilitadas e relê o /me',
+      (tester) async {
+    final (api, _) = await _open(
+      tester,
+      maintenance: maintenanceJson(),
+      picked: const ['/tmp/a.jpg', '/tmp/b.jpg'],
+    );
+    api.me = {
+      'user_type': 'user',
+      'features': {'maintenance_photos': false},
+    };
+    api.uploadHandler = (path, _) async {
+      throw dioError(403, {'message': 'This action is unauthorized.'});
+    };
+
+    await tester.tap(find.byKey(const Key('upload_gallery')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Fotos não estão habilitadas para sua conta.'),
+        findsOneWidget);
+    // A fila para no primeiro 403 e a folha se fecha.
+    expect(api.uploads, hasLength(1));
+    expect(find.byKey(const Key('upload_subject')), findsNothing);
+    expect(api.meCalls, 1);
+    // Com o /me novo, a seção some.
+    expect(find.byKey(const Key('photos_section')), findsNothing);
   });
 }

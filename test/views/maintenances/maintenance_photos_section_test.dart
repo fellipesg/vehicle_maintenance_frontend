@@ -9,7 +9,10 @@ import '../../support_photos.dart';
 Future<FakePhotosApi> _pump(
   WidgetTester tester, {
   required Map<String, dynamic> maintenance,
-  Map<String, dynamic> user = const {'user_type': 'user'},
+  Map<String, dynamic> user = const {
+    'user_type': 'user',
+    'features': photosFeatureOn
+  },
   FakePicker? picker,
 }) async {
   tester.view.physicalSize = const Size(800, 4000);
@@ -197,7 +200,11 @@ void main() {
     await _pump(
       tester,
       maintenance: maintenanceJson(verified: true, workshopId: 9),
-      user: const {'user_type': 'workshop', 'workshop_id': 9},
+      user: const {
+        'user_type': 'workshop',
+        'features': photosFeatureOn,
+        'workshop_id': 9
+      },
     );
 
     expect(find.byKey(const Key('add_photos_button')), findsOneWidget);
@@ -211,7 +218,11 @@ void main() {
         workshopId: 9,
         photos: [photoJson(id: 1)],
       ),
-      user: const {'user_type': 'workshop', 'workshop_id': 77},
+      user: const {
+        'user_type': 'workshop',
+        'features': photosFeatureOn,
+        'workshop_id': 77
+      },
     );
 
     expect(find.byKey(const Key('photo_thumb_1')), findsOneWidget);
@@ -293,5 +304,54 @@ void main() {
 
     expect(find.text('Sem permissão.'), findsOneWidget);
     expect(find.byType(MaintenancePhotoViewerPage), findsOneWidget);
+  });
+
+  group('recurso de fotos desligado', () {
+    final cases = <String, Map<String, dynamic>>{
+      'flag false': {
+        'user_type': 'user',
+        'features': {'maintenance_photos': false},
+      },
+      'features vazio': {'user_type': 'user', 'features': <String, dynamic>{}},
+      'sem features': {'user_type': 'user'},
+    };
+
+    for (final entry in cases.entries) {
+      testWidgets('${entry.key}: esconde a seção com fotos', (tester) async {
+        await _pump(
+          tester,
+          user: entry.value,
+          maintenance: maintenanceJson(photos: [photoJson(id: 1)]),
+        );
+
+        expect(find.byKey(const Key('photos_section')), findsNothing);
+        expect(find.text('Fotos'), findsNothing);
+      });
+
+      testWidgets('${entry.key}: sem "Adicionar fotos" nem cartão bloqueado',
+          (tester) async {
+        await _pump(tester, user: entry.value, maintenance: maintenanceJson());
+
+        expect(find.byKey(const Key('add_photos_button')), findsNothing);
+
+        await _pump(
+          tester,
+          user: entry.value,
+          maintenance: maintenanceJson(photosLocked: true, photosCount: 2),
+        );
+
+        expect(find.byKey(const Key('photos_locked_card')), findsNothing);
+        expect(find.byKey(const Key('photos_section')), findsNothing);
+      });
+    }
+
+    testWidgets('ligado: a seção aparece', (tester) async {
+      await _pump(
+        tester,
+        maintenance: maintenanceJson(photos: [photoJson(id: 1)]),
+      );
+
+      expect(find.byKey(const Key('photos_section')), findsOneWidget);
+    });
   });
 }

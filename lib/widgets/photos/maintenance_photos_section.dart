@@ -5,6 +5,8 @@ import '../../models/maintenance.dart';
 import '../../models/maintenance_photo.dart';
 import '../../services/api_error.dart';
 import '../../services/api_service.dart';
+import '../../services/auth_service.dart';
+import '../../services/maintenance_photos_feature.dart';
 import '../../services/maintenance_photo_picker.dart';
 import '../../views/maintenances/maintenance_photo_viewer_page.dart';
 import 'maintenance_photo_image.dart';
@@ -148,6 +150,9 @@ class _MaintenancePhotosSectionState extends State<MaintenancePhotosSection> {
 
   Future<void> _openUpload() async {
     var uploaded = false;
+    var featureDisabled = false;
+    final messenger = ScaffoldMessenger.of(context);
+    final auth = context.read<AuthService>();
 
     await showModalBottomSheet<bool>(
       context: context,
@@ -159,8 +164,20 @@ class _MaintenancePhotosSectionState extends State<MaintenancePhotosSection> {
         initialStage: _stage,
         picker: widget.picker,
         onUploaded: () => uploaded = true,
+        onFeatureDisabled: () => featureDisabled = true,
       ),
     );
+
+    if (featureDisabled) {
+      messenger.showSnackBar(
+        const SnackBar(content: Text(MaintenancePhotosFeature.disabledMessage)),
+      );
+      await auth.getCurrentUser();
+      if (mounted) {
+        await widget.onChanged();
+      }
+      return;
+    }
 
     if (uploaded && mounted) {
       await widget.onChanged();
@@ -171,6 +188,10 @@ class _MaintenancePhotosSectionState extends State<MaintenancePhotosSection> {
   Widget build(BuildContext context) {
     final maintenance = widget.maintenance;
     final theme = Theme.of(context);
+
+    if (!MaintenancePhotosFeature.of(context)) {
+      return const SizedBox.shrink();
+    }
 
     return Card(
       child: Padding(
@@ -311,20 +332,16 @@ class _MaintenancePhotosSectionState extends State<MaintenancePhotosSection> {
     final vehicle =
         stagePhotos.where((p) => p.subject == PhotoSubject.vehicle).toList();
     final byItem = <int?, List<MaintenancePhoto>>{};
-    for (final photo
-        in stagePhotos.where((p) => p.subject == PhotoSubject.part)) {
+    for (final photo in stagePhotos.where(
+      (p) => p.subject == PhotoSubject.part,
+    )) {
       byItem.putIfAbsent(photo.maintenanceItemId, () => []).add(photo);
     }
 
     return [
       if (vehicle.isNotEmpty) _group(context, 'Veículo', vehicle, ordered),
       for (final entry in byItem.entries)
-        _group(
-          context,
-          _itemNames[entry.key] ?? 'Peça',
-          entry.value,
-          ordered,
-        ),
+        _group(context, _itemNames[entry.key] ?? 'Peça', entry.value, ordered),
     ];
   }
 
@@ -341,10 +358,7 @@ class _MaintenancePhotosSectionState extends State<MaintenancePhotosSection> {
         children: [
           Semantics(
             header: true,
-            child: Text(
-              title,
-              style: Theme.of(context).textTheme.labelLarge,
-            ),
+            child: Text(title, style: Theme.of(context).textTheme.labelLarge),
           ),
           const SizedBox(height: 8),
           GridView.count(

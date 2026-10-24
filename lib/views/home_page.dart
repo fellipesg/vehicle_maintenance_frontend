@@ -28,7 +28,7 @@ class HomePage extends StatefulWidget {
   State<HomePage> createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage> {
+class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   int _selectedIndex = 0;
   bool _vehiclesListScrolled = false;
 
@@ -40,13 +40,32 @@ class _HomePageState extends State<HomePage> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addObserver(this);
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (mounted) {
         context.read<NotificationInbox>().refreshUnreadCount();
         _refreshWorkshopRecords();
-        ExportPhotosPrompt.maybeAsk(context);
+        // O recurso de fotos é por conta: relê o /me antes de perguntar.
+        await context.read<AuthService>().getCurrentUser();
+        if (mounted) {
+          setState(() {});
+          ExportPhotosPrompt.maybeAsk(context);
+        }
       }
     });
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && mounted) {
+      context.read<AuthService>().getCurrentUser();
+    }
   }
 
   /// Oficina e admin não decidem registros; zera o contador para não sobrar o

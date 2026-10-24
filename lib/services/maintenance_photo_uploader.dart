@@ -1,8 +1,10 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 
 import '../models/maintenance_photo.dart';
 import 'api_error.dart';
 import 'api_service.dart';
+import 'maintenance_photos_feature.dart';
 
 /// Limite de fotos por grupo (assunto + momento) imposto pelo backend.
 const int maxPhotosPerGroup = 4;
@@ -43,6 +45,10 @@ class MaintenancePhotoUploader extends ChangeNotifier {
   final int? maintenanceItemId;
   final List<PhotoUploadItem> items;
 
+  /// O backend respondeu 403: a conta não tem o recurso de fotos. Interrompe a
+  /// fila, porque os demais envios receberiam a mesma resposta.
+  bool featureDisabled = false;
+
   bool _running = false;
   bool _disposed = false;
 
@@ -53,9 +59,11 @@ class MaintenancePhotoUploader extends ChangeNotifier {
       items.any((item) => item.status == PhotoUploadStatus.done);
   bool get isFinished =>
       !_running &&
-      items.every((item) =>
-          item.status == PhotoUploadStatus.done ||
-          item.status == PhotoUploadStatus.failed);
+      items.every(
+        (item) =>
+            item.status == PhotoUploadStatus.done ||
+            item.status == PhotoUploadStatus.failed,
+      );
 
   /// Quantos arquivos ainda cabem no grupo, dado quantos já existem nele.
   static int remainingSlots(int existingInGroup) {
@@ -79,6 +87,9 @@ class MaintenancePhotoUploader extends ChangeNotifier {
       }
 
       await _send(item);
+      if (featureDisabled) {
+        break;
+      }
     }
 
     _running = false;
@@ -114,9 +125,14 @@ class MaintenancePhotoUploader extends ChangeNotifier {
         ..status = PhotoUploadStatus.done
         ..progress = 1;
     } catch (error) {
+      if (error is DioException && error.response?.statusCode == 403) {
+        featureDisabled = true;
+      }
       item
         ..status = PhotoUploadStatus.failed
-        ..error = apiErrorMessage(error, fallback: 'Erro ao enviar a foto');
+        ..error = featureDisabled
+            ? MaintenancePhotosFeature.disabledMessage
+            : apiErrorMessage(error, fallback: 'Erro ao enviar a foto');
     }
 
     _notify();

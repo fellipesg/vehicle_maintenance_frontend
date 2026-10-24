@@ -119,4 +119,20 @@ void main() {
       '/tmp/b.jpg',
     ]);
   });
+
+  test('403 marca o recurso como desligado e para a fila', () async {
+    final api = FakePhotosApi()
+      ..uploadHandler = (path, _) async {
+        throw dioError(403, {'message': 'This action is unauthorized.'});
+      };
+    final uploader = _uploader(api, ['/tmp/a.jpg', '/tmp/b.jpg']);
+
+    await uploader.start();
+
+    expect(uploader.featureDisabled, isTrue);
+    expect(api.uploads, hasLength(1));
+    expect(uploader.items.first.error,
+        'Fotos não estão habilitadas para sua conta.');
+    expect(uploader.items.last.status, PhotoUploadStatus.pending);
+  });
 }
