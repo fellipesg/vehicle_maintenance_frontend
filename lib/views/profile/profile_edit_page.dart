@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
+import '../../models/profile_address.dart';
 import '../../services/auth_service.dart';
 import '../../services/cep_service.dart';
 import '../../utils/cep_autofill.dart';
@@ -37,6 +38,10 @@ class _ProfileEditPageState extends State<ProfileEditPage> with CepAutofill {
   String? _email;
   bool _isLoading = false;
 
+  /// Loja e oficina editam o endereço no cadastro da empresa, na web.
+  /// Para elas a seção Endereço não existe aqui.
+  bool _editsAddress = true;
+
   @override
   late final CepService cepService = widget.cepService ?? CepService();
 
@@ -54,20 +59,32 @@ class _ProfileEditPageState extends State<ProfileEditPage> with CepAutofill {
   void initState() {
     super.initState();
     _loadUser();
-    // Depois do _loadUser: preencher o campo com o CEP já salvo não pode
-    // disparar uma consulta que sobrescreva o endereço do usuário.
-    listenToCepField();
+
+    if (_editsAddress) {
+      // Depois do _loadUser: preencher o campo com o CEP já salvo não pode
+      // disparar uma consulta que sobrescreva o endereço do usuário.
+      listenToCepField();
+    }
   }
 
   void _loadUser() {
-    final user = Provider.of<AuthService>(context, listen: false).user;
+    final authService = Provider.of<AuthService>(context, listen: false);
+    final user = authService.user;
     if (user == null) {
       return;
     }
 
+    _editsAddress = !authService.isCompanyAccount;
+
     _nameController.text = user['name']?.toString() ?? '';
     _email = user['email']?.toString();
     _phoneController.text = user['phone']?.toString() ?? '';
+    _avatarUrl = user['avatar_url']?.toString();
+
+    if (!_editsAddress) {
+      return;
+    }
+
     _postalCodeController.text = user['postal_code']?.toString() ?? '';
     _streetController.text = user['street']?.toString() ?? '';
     _numberController.text = user['number']?.toString() ?? '';
@@ -75,7 +92,6 @@ class _ProfileEditPageState extends State<ProfileEditPage> with CepAutofill {
     _cityController.text = user['city']?.toString() ?? '';
     _stateController.text = user['state']?.toString() ?? '';
     _countryController.text = user['country']?.toString() ?? 'Brasil';
-    _avatarUrl = user['avatar_url']?.toString();
   }
 
   @override
@@ -151,13 +167,7 @@ class _ProfileEditPageState extends State<ProfileEditPage> with CepAutofill {
       await authService.updateProfile(
         name: _nameController.text.trim(),
         phone: _nullableText(_phoneController.text),
-        postalCode: _nullableText(_postalCodeController.text),
-        street: _nullableText(_streetController.text),
-        number: _nullableText(_numberController.text),
-        complement: _nullableText(_complementController.text),
-        city: _nullableText(_cityController.text),
-        state: _nullableText(_stateController.text),
-        country: _nullableText(_countryController.text),
+        address: _editsAddress ? _address() : null,
       );
 
       if (_avatarFile != null) {
@@ -191,10 +201,125 @@ class _ProfileEditPageState extends State<ProfileEditPage> with CepAutofill {
     }
   }
 
+  ProfileAddress _address() => ProfileAddress(
+        postalCode: _nullableText(_postalCodeController.text),
+        street: _nullableText(_streetController.text),
+        number: _nullableText(_numberController.text),
+        complement: _nullableText(_complementController.text),
+        city: _nullableText(_cityController.text),
+        state: _nullableText(_stateController.text),
+        country: _nullableText(_countryController.text),
+      );
+
   String? _nullableText(String value) {
     final trimmed = value.trim();
     return trimmed.isEmpty ? null : trimmed;
   }
+
+  /// Endereço do proprietário. Loja e oficina não têm esta seção: o
+  /// endereço delas é o do cadastro da empresa, editado só na web.
+  List<Widget> _addressSection(BuildContext context) => [
+        const SizedBox(height: 24),
+        Text(
+          'Endereço',
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+        ),
+        const SizedBox(height: 12),
+        TextFormField(
+          key: const Key('profile_cep_field'),
+          controller: _postalCodeController,
+          decoration: InputDecoration(
+            labelText: 'CEP',
+            prefixIcon: const Icon(Icons.markunread_mailbox),
+            border: const OutlineInputBorder(),
+            helperText: 'Preenche rua, cidade e UF automaticamente',
+            suffixIcon: isLookingUpCep
+                ? const Padding(
+                    padding: EdgeInsets.all(12),
+                    child: SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  )
+                : null,
+          ),
+          keyboardType: TextInputType.number,
+        ),
+        const SizedBox(height: 16),
+        TextFormField(
+          controller: _streetController,
+          decoration: const InputDecoration(
+            labelText: 'Rua',
+            prefixIcon: Icon(Icons.home),
+            border: OutlineInputBorder(),
+          ),
+        ),
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            Expanded(
+              flex: 2,
+              child: TextFormField(
+                controller: _numberController,
+                decoration: const InputDecoration(
+                  labelText: 'Número',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              flex: 3,
+              child: TextFormField(
+                controller: _complementController,
+                decoration: const InputDecoration(
+                  labelText: 'Complemento',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            Expanded(
+              flex: 3,
+              child: TextFormField(
+                controller: _cityController,
+                decoration: const InputDecoration(
+                  labelText: 'Cidade',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: TextFormField(
+                controller: _stateController,
+                decoration: const InputDecoration(
+                  labelText: 'UF',
+                  border: OutlineInputBorder(),
+                ),
+                textCapitalization: TextCapitalization.characters,
+                maxLength: 2,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        TextFormField(
+          controller: _countryController,
+          decoration: const InputDecoration(
+            labelText: 'País',
+            prefixIcon: Icon(Icons.public),
+            border: OutlineInputBorder(),
+          ),
+        ),
+      ];
 
   @override
   Widget build(BuildContext context) {
@@ -269,106 +394,7 @@ class _ProfileEditPageState extends State<ProfileEditPage> with CepAutofill {
                   ),
                   keyboardType: TextInputType.phone,
                 ),
-                const SizedBox(height: 24),
-                Text(
-                  'Endereço',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  key: const Key('profile_cep_field'),
-                  controller: _postalCodeController,
-                  decoration: InputDecoration(
-                    labelText: 'CEP',
-                    prefixIcon: const Icon(Icons.markunread_mailbox),
-                    border: const OutlineInputBorder(),
-                    helperText: 'Preenche rua, cidade e UF automaticamente',
-                    suffixIcon: isLookingUpCep
-                        ? const Padding(
-                            padding: EdgeInsets.all(12),
-                            child: SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            ),
-                          )
-                        : null,
-                  ),
-                  keyboardType: TextInputType.number,
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: _streetController,
-                  decoration: const InputDecoration(
-                    labelText: 'Rua',
-                    prefixIcon: Icon(Icons.home),
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Row(
-                  children: [
-                    Expanded(
-                      flex: 2,
-                      child: TextFormField(
-                        controller: _numberController,
-                        decoration: const InputDecoration(
-                          labelText: 'Número',
-                          border: OutlineInputBorder(),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      flex: 3,
-                      child: TextFormField(
-                        controller: _complementController,
-                        decoration: const InputDecoration(
-                          labelText: 'Complemento',
-                          border: OutlineInputBorder(),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                Row(
-                  children: [
-                    Expanded(
-                      flex: 3,
-                      child: TextFormField(
-                        controller: _cityController,
-                        decoration: const InputDecoration(
-                          labelText: 'Cidade',
-                          border: OutlineInputBorder(),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: TextFormField(
-                        controller: _stateController,
-                        decoration: const InputDecoration(
-                          labelText: 'UF',
-                          border: OutlineInputBorder(),
-                        ),
-                        textCapitalization: TextCapitalization.characters,
-                        maxLength: 2,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: _countryController,
-                  decoration: const InputDecoration(
-                    labelText: 'País',
-                    prefixIcon: Icon(Icons.public),
-                    border: OutlineInputBorder(),
-                  ),
-                ),
+                if (_editsAddress) ..._addressSection(context),
                 const SizedBox(height: 32),
                 ElevatedButton(
                   onPressed: _isLoading ? null : _handleSave,
