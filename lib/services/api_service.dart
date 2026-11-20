@@ -31,7 +31,8 @@ class ApiService {
   };
 
   ApiService({required this.baseUrl})
-      : _dio = Dio(BaseOptions(
+    : _dio = Dio(
+        BaseOptions(
           baseUrl: baseUrl,
           headers: {
             'Content-Type': 'application/json',
@@ -39,24 +40,29 @@ class ApiService {
           },
           connectTimeout: const Duration(seconds: 30),
           receiveTimeout: const Duration(seconds: 30),
-        )) {
+        ),
+      ) {
     if (kDebugMode) {
-      _dio.interceptors.add(LogInterceptor(
-        requestBody: false,
-        responseBody: false,
-        responseHeader: false,
-      ));
+      _dio.interceptors.add(
+        LogInterceptor(
+          requestBody: false,
+          responseBody: false,
+          responseHeader: false,
+        ),
+      );
     }
 
-    _dio.interceptors.add(InterceptorsWrapper(
-      onError: (DioException error, ErrorInterceptorHandler handler) async {
-        if (_isExpiredSession(error)) {
-          await _notifyUnauthorized();
-        }
+    _dio.interceptors.add(
+      InterceptorsWrapper(
+        onError: (DioException error, ErrorInterceptorHandler handler) async {
+          if (_isExpiredSession(error)) {
+            await _notifyUnauthorized();
+          }
 
-        handler.next(error);
-      },
-    ));
+          handler.next(error);
+        },
+      ),
+    );
   }
 
   bool _isExpiredSession(DioException error) {
@@ -113,10 +119,7 @@ class ApiService {
   }) async {
     return await _dio.get(
       '/my-vehicles',
-      queryParameters: {
-        'page': page,
-        'per_page': perPage,
-      },
+      queryParameters: {'page': page, 'per_page': perPage},
       options: Options(
         validateStatus: (status) =>
             status != null && (status < 400 || status == 304),
@@ -131,10 +134,7 @@ class ApiService {
   }) async {
     return await _dio.get(
       '/admin/vehicles',
-      queryParameters: {
-        'page': page,
-        'per_page': perPage,
-      },
+      queryParameters: {'page': page, 'per_page': perPage},
     );
   }
 
@@ -195,6 +195,32 @@ class ApiService {
     return await _dio.put('/vehicles/$id', data: data);
   }
 
+  /// Lê o PDF do CRLV-e no servidor (`POST /vehicles/crlv`). A resposta diz se o
+  /// veículo é novo, já está na RevisaLog ou já é da conta (`CrlvReading`).
+  Future<Response> readCrlv(String filePath) async {
+    final formData = FormData.fromMap({
+      'crlv': await MultipartFile.fromFile(
+        filePath,
+        filename: filePath.split('/').last,
+      ),
+    });
+
+    return await _dio.post(
+      '/vehicles/crlv',
+      data: formData,
+      options: Options(contentType: 'multipart/form-data'),
+    );
+  }
+
+  /// Vincula à conta o veículo que a leitura do CRLV-e encontrou, com a posse
+  /// verificada. O token vale 30 minutos e uma gravação.
+  Future<Response> claimVehicleWithCrlv(String verificationToken) async {
+    return await _dio.post(
+      '/vehicles/crlv/claim',
+      data: {'crlv_verification_token': verificationToken},
+    );
+  }
+
   /// Reivindica um veículo já cadastrado. A placa e o RENAVAM são a prova de
   /// posse e o backend os confere contra o documento do veículo
   /// (`VehicleOwnershipService::documentMatchesVehicle`), respondendo 422 com
@@ -226,12 +252,14 @@ class ApiService {
     int perPage = 15,
     bool? verified,
   }) async {
-    return await _dio
-        .get('/vehicles/$vehicleId/maintenances', queryParameters: {
-      'page': page,
-      'per_page': perPage,
-      if (verified != null) 'verified': verified ? 1 : 0,
-    });
+    return await _dio.get(
+      '/vehicles/$vehicleId/maintenances',
+      queryParameters: {
+        'page': page,
+        'per_page': perPage,
+        if (verified != null) 'verified': verified ? 1 : 0,
+      },
+    );
   }
 
   Future<Response> requestVehiclePdfExport(String vehicleId) async {
@@ -263,11 +291,10 @@ class ApiService {
     int page = 1,
     int perPage = 15,
   }) async {
-    return await _dio.get('/maintenances', queryParameters: {
-      'page': page,
-      'per_page': perPage,
-      ...?queryParams,
-    });
+    return await _dio.get(
+      '/maintenances',
+      queryParameters: {'page': page, 'per_page': perPage, ...?queryParams},
+    );
   }
 
   Future<Response> getMaintenance(String id) async {
@@ -278,14 +305,14 @@ class ApiService {
     return await _dio.post(
       '/maintenances',
       data: formData,
-      options: Options(
-        contentType: 'multipart/form-data',
-      ),
+      options: Options(contentType: 'multipart/form-data'),
     );
   }
 
   Future<Response> updateMaintenance(
-      String id, Map<String, dynamic> data) async {
+    String id,
+    Map<String, dynamic> data,
+  ) async {
     return await _dio.put('/maintenances/$id', data: data);
   }
 
@@ -324,9 +351,7 @@ class ApiService {
   Future<Response> downloadInvoice(String id) async {
     return await _dio.get(
       '/invoices/$id/download',
-      options: Options(
-        responseType: ResponseType.bytes,
-      ),
+      options: Options(responseType: ResponseType.bytes),
     );
   }
 
@@ -387,11 +412,10 @@ class ApiService {
     int page = 1,
     int perPage = 15,
   }) async {
-    return await _dio.get('/workshops', queryParameters: {
-      'page': page,
-      'per_page': perPage,
-      ...?queryParams,
-    });
+    return await _dio.get(
+      '/workshops',
+      queryParameters: {'page': page, 'per_page': perPage, ...?queryParams},
+    );
   }
 
   Future<Response> getWorkshop(String id) async {
@@ -428,10 +452,7 @@ class ApiService {
   }) async {
     return await _dio.get(
       '/workshops/$workshopId/warranty-templates',
-      queryParameters: {
-        'page': page,
-        'per_page': perPage,
-      },
+      queryParameters: {'page': page, 'per_page': perPage},
     );
   }
 
@@ -484,12 +505,7 @@ class ApiService {
   }) async {
     return await _dio.post(
       '/workshop/vehicles',
-      data: {
-        'chassis': chassis,
-        'brand': brand,
-        'model': model,
-        'year': year,
-      },
+      data: {'chassis': chassis, 'brand': brand, 'model': model, 'year': year},
     );
   }
 
