@@ -3,7 +3,9 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:dio/dio.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:image_picker/image_picker.dart';
+import '../../models/crlv_reading.dart';
 import '../../models/vehicle.dart';
 import '../../repositories/vehicle_repository.dart';
 import '../../services/api_error.dart';
@@ -15,10 +17,29 @@ import '../../widgets/cover_image_cropper.dart';
 import '../../widgets/terms_scroll_acceptance.dart';
 import 'package:provider/provider.dart';
 
+/// Escolhe o PDF do CRLV-e e devolve o caminho, ou null se a pessoa desistir.
+typedef CrlvPdfPicker = Future<String?> Function();
+
+Future<String?> _pickCrlvPdfFromDevice() async {
+  final result = await FilePicker.platform.pickFiles(
+    type: FileType.custom,
+    allowedExtensions: ['pdf'],
+  );
+
+  return result?.files.single.path;
+}
+
 class VehicleFormPage extends StatefulWidget {
   final Vehicle? vehicle;
 
-  const VehicleFormPage({super.key, this.vehicle});
+  /// Trocável nos testes; no app abre o seletor de arquivos do sistema.
+  final CrlvPdfPicker pickCrlvPdf;
+
+  const VehicleFormPage({
+    super.key,
+    this.vehicle,
+    this.pickCrlvPdf = _pickCrlvPdfFromDevice,
+  });
 
   @override
   State<VehicleFormPage> createState() => _VehicleFormPageState();
@@ -59,6 +80,12 @@ class _VehicleFormPageState extends State<VehicleFormPage> {
   String? _modelsLoadedForBrand;
 
   bool _hasBrandText = false;
+
+  /// CRLV-e lido pelo servidor para este cadastro. Enquanto existir, placa e
+  /// RENAVAM vêm dele e ficam travados: o backend confere os dois contra o
+  /// documento, e o token que vai no cadastro verifica a posse.
+  CrlvReading? _crlv;
+  bool _readingCrlv = false;
 
   @override
   void initState() {
@@ -280,9 +307,7 @@ class _VehicleFormPageState extends State<VehicleFormPage> {
         context: context,
         builder: (context) => AlertDialog(
           title: const Text('Registrar troca de placa?'),
-          content: const Text(
-            'A placa anterior ficará no histórico.',
-          ),
+          content: const Text('A placa anterior ficará no histórico.'),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context, false),
@@ -333,6 +358,8 @@ class _VehicleFormPageState extends State<VehicleFormPage> {
             : _engineController.text.trim(),
         'current_kilometers': int.parse(_kilometersController.text.trim()),
         if (widget.vehicle == null) 'terms_accepted': true,
+        if (widget.vehicle == null && _crlv != null)
+          'crlv_verification_token': _crlv!.verificationToken,
       };
 
       Response response;
@@ -367,9 +394,13 @@ class _VehicleFormPageState extends State<VehicleFormPage> {
         Navigator.of(context).pop(true);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(widget.vehicle != null
-                ? 'Veículo atualizado com sucesso!'
-                : 'Veículo cadastrado com sucesso!'),
+            content: Text(
+              widget.vehicle != null
+                  ? 'Veículo atualizado com sucesso!'
+                  : _crlv != null
+                      ? 'Veículo cadastrado com o CRLV-e. A posse está confirmada.'
+                      : 'Veículo cadastrado com sucesso!',
+            ),
             backgroundColor: Colors.green,
           ),
         );
@@ -394,6 +425,256 @@ class _VehicleFormPageState extends State<VehicleFormPage> {
     }
   }
 
+  Future<void> _pickAndReadCrlv() async {
+    final String? path;
+
+    try {
+      path = await widget.pickCrlvPdf();
+    } catch (e) {
+      _showError('Não foi possível abrir o arquivo: $e');
+      return;
+    }
+
+    if (path == null || path.isEmpty || !mounted) {
+      return;
+    }
+
+    setState(() => _readingCrlv = true);
+
+    final CrlvReading reading;
+
+    try {
+      final apiService = Provider.of<ApiService>(context, listen: false);
+      final response = await apiService.readCrlv(path);
+      final data = response.data['data'];
+
+      if (response.data['success'] != true || data is! Map) {
+        throw Exception(
+            response.data['message'] ?? 'Não foi possível ler o CRLV-e.');
+      }
+
+      reading = CrlvReading.fromJson(Map<String, dynamic>.from(data));
+    } catch (e) {
+      _showError(apiErrorMessage(e));
+      return;
+    } finally {
+      if (mounted) {
+        setState(() => _readingCrlv = false);
+      }
+    }
+
+    if (!mounted) return;
+
+    try {
+      switch (reading.mode) {
+        case CrlvReadingMode.linked:
+          _showInfo('Este veículo já está na sua conta.');
+        case CrlvReadingMode.claim:
+          await _offerClaim(reading);
+        case CrlvReadingMode.newVehicle:
+          if (reading.needsPowerOfAttorney) {
+            await _showPowerOfAttorneyNotice();
+          } else {
+            _applyCrlv(reading);
+          }
+      }
+    } catch (e) {
+      _showError(apiErrorMessage(e));
+    }
+  }
+
+  /// Preenche o formulário com o que o servidor leu. Quilometragem, capas e o
+  /// aceite dos termos continuam com a pessoa: o CRLV-e não traz.
+  void _applyCrlv(CrlvReading reading) {
+    setState(() {
+      _crlv = reading;
+      _licensePlateController.text = reading.licensePlate;
+      _renavamController.text = reading.renavam;
+      _chassisController.text = reading.chassis ?? _chassisController.text;
+      _brandController.text = reading.brand;
+      _modelController.text = reading.model;
+      if (reading.year != null) {
+        _yearController.text = reading.year.toString();
+      }
+      _colorController.text = reading.color ?? _colorController.text;
+      _engineController.text = reading.engine ?? _engineController.text;
+    });
+
+    _onBrandSelected(reading.brand);
+  }
+
+  void _clearCrlv() {
+    setState(() => _crlv = null);
+  }
+
+  Future<void> _offerClaim(CrlvReading reading) async {
+    if (reading.needsPowerOfAttorney) {
+      await _showPowerOfAttorneyNotice();
+      return;
+    }
+
+    final existing = reading.existingVehicle;
+    final count = existing?.maintenancesCount ?? 0;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Este veículo já está na RevisaLog'),
+        content: Text(
+          '${existing?.title ?? 'Veículo'}'
+          '${count > 0 ? ' com $count ${count == 1 ? 'manutenção registrada' : 'manutenções registradas'}' : ''}. '
+          'O CRLV-e confirma que ele é seu: vincule-o à sua conta para continuar o histórico.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Vincular'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) {
+      return;
+    }
+
+    final apiService = Provider.of<ApiService>(context, listen: false);
+    final response = await apiService.claimVehicleWithCrlv(
+      reading.verificationToken,
+    );
+
+    if (response.data['success'] != true) {
+      throw Exception(
+        response.data['message'] ?? 'Não foi possível vincular o veículo.',
+      );
+    }
+
+    final pending = response.data['data']?['pending_workshop_records_count'];
+    if (!mounted) return;
+
+    await context.read<VehicleRepository>().invalidate();
+    if (!mounted) return;
+
+    Navigator.of(context).pop(true);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          pending is int && pending > 0
+              ? 'Veículo vinculado. Oficinas registraram serviços nele: veja em Registros de oficinas.'
+              : 'Veículo vinculado à sua conta.',
+        ),
+        backgroundColor: Colors.green,
+      ),
+    );
+  }
+
+  Future<void> _showPowerOfAttorneyNotice() {
+    return showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Termine pelo site'),
+        content: const Text(
+          'O CRLV-e não está no CPF/CNPJ da sua conta, então este veículo precisa '
+          'de procuração. Termine o cadastro pelo site da RevisaLog.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Entendi'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showError(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), backgroundColor: Colors.red),
+    );
+  }
+
+  void _showInfo(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  Widget _crlvSection() {
+    final theme = Theme.of(context);
+    final reading = _crlv;
+
+    return Card(
+      key: const Key('vehicle_crlv_section'),
+      margin: EdgeInsets.zero,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  reading == null ? Icons.description_outlined : Icons.verified,
+                  color: theme.colorScheme.primary,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    reading == null
+                        ? 'Cadastre com o CRLV-e'
+                        : 'Dados lidos do CRLV-e',
+                    style: theme.textTheme.titleMedium,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              reading == null
+                  ? 'Envie o PDF do CRLV-e digital (app Carteira Digital de '
+                      'Trânsito) e preenchemos os dados. Com ele, a posse do '
+                      'veículo fica confirmada.'
+                  : 'Confira os dados, informe a quilometragem e aceite os '
+                      'termos. Placa e RENAVAM vêm do documento.'
+                      '${reading.brandMatched && reading.modelMatched ? '' : ' Confira a marca e o modelo: não achamos no catálogo exatamente o que está no documento.'}',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: 12),
+            if (reading == null)
+              FilledButton.icon(
+                key: const Key('vehicle_crlv_pick'),
+                onPressed: _readingCrlv || _isLoading ? null : _pickAndReadCrlv,
+                icon: _readingCrlv
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.upload_file),
+                label: Text(
+                  _readingCrlv ? 'Lendo o CRLV-e…' : 'Enviar CRLV-e (PDF)',
+                ),
+              )
+            else
+              OutlinedButton.icon(
+                key: const Key('vehicle_crlv_clear'),
+                onPressed: _isLoading ? null : _clearCrlv,
+                icon: const Icon(Icons.close),
+                label: const Text('Preencher sem o CRLV-e'),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _coverPreview({
     required File? file,
     required String? existingUrl,
@@ -405,10 +686,7 @@ class _VehicleFormPageState extends State<VehicleFormPage> {
         borderRadius: BorderRadius.circular(12),
         child: AspectRatio(
           aspectRatio: aspectRatio,
-          child: Image.file(
-            file,
-            fit: BoxFit.cover,
-          ),
+          child: Image.file(file, fit: BoxFit.cover),
         ),
       );
     }
@@ -432,10 +710,7 @@ class _VehicleFormPageState extends State<VehicleFormPage> {
   }) {
     return Column(
       children: [
-        Text(
-          title,
-          style: Theme.of(context).textTheme.titleSmall,
-        ),
+        Text(title, style: Theme.of(context).textTheme.titleSmall),
         const SizedBox(height: 8),
         GestureDetector(
           onTap: onPick,
@@ -477,6 +752,10 @@ class _VehicleFormPageState extends State<VehicleFormPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                if (widget.vehicle == null) ...[
+                  _crlvSection(),
+                  const SizedBox(height: 24),
+                ],
                 _coverSection(
                   title: 'Capa paisagem (celular deitado)',
                   pickLabel: CoverFramingLandscape.pickLabel,
@@ -506,6 +785,7 @@ class _VehicleFormPageState extends State<VehicleFormPage> {
                     border: OutlineInputBorder(),
                     helperText:
                         'O chassi identifica o veículo para sempre. A placa pode mudar.',
+                    helperMaxLines: 2,
                   ),
                   textCapitalization: TextCapitalization.characters,
                   maxLength: 17,
@@ -539,6 +819,7 @@ class _VehicleFormPageState extends State<VehicleFormPage> {
                 const SizedBox(height: 16),
                 TextFormField(
                   controller: _licensePlateController,
+                  readOnly: _crlv != null,
                   decoration: const InputDecoration(
                     labelText: 'Placa *',
                     prefixIcon: Icon(Icons.confirmation_number),
@@ -560,6 +841,7 @@ class _VehicleFormPageState extends State<VehicleFormPage> {
                 const SizedBox(height: 16),
                 TextFormField(
                   controller: _renavamController,
+                  readOnly: _crlv != null,
                   decoration: const InputDecoration(
                     labelText: 'RENAVAM *',
                     prefixIcon: Icon(Icons.badge),
@@ -619,6 +901,7 @@ class _VehicleFormPageState extends State<VehicleFormPage> {
                 ),
                 const SizedBox(height: 16),
                 Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Expanded(
                       child: TextFormField(
@@ -629,7 +912,12 @@ class _VehicleFormPageState extends State<VehicleFormPage> {
                           border: OutlineInputBorder(),
                         ),
                         keyboardType: TextInputType.number,
-                        maxLength: 4,
+                        // Sem maxLength: o contador "0/4" deixava o Ano mais
+                        // alto que o Cor ao lado e desalinhava a linha.
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly,
+                          LengthLimitingTextInputFormatter(4),
+                        ],
                         validator: (value) {
                           if (value == null || value.isEmpty) {
                             return 'Por favor, insira o ano';
@@ -719,7 +1007,8 @@ class _VehicleFormPageState extends State<VehicleFormPage> {
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
                       : Text(
-                          widget.vehicle != null ? 'Atualizar' : 'Cadastrar'),
+                          widget.vehicle != null ? 'Atualizar' : 'Cadastrar',
+                        ),
                 ),
               ],
             ),
