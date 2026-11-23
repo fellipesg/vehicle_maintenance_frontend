@@ -106,8 +106,9 @@ class _FakeApiService extends ApiService {
 
 Future<_FakeApiService> _pumpForm(
   WidgetTester tester,
-  Map<String, dynamic> reading,
-) async {
+  Map<String, dynamic> reading, {
+  bool startWithCrlv = false,
+}) async {
   SharedPreferences.setMockInitialValues({});
   final api = _FakeApiService(reading);
 
@@ -126,6 +127,7 @@ Future<_FakeApiService> _pumpForm(
                   MaterialPageRoute(
                     builder: (_) => VehicleFormPage(
                       pickCrlvPdf: () async => '/tmp/CRLV-e.pdf',
+                      startWithCrlv: startWithCrlv,
                     ),
                   ),
                 ),
@@ -217,6 +219,21 @@ void main() {
     expect(api.claimedWith, _token);
     expect(find.byType(VehicleFormPage), findsNothing);
     expect(find.text('Veículo vinculado à sua conta.'), findsOneWidget);
+  });
+
+  testWidgets('startWithCrlv reads the CRLV-e as soon as the form opens',
+      (tester) async {
+    await _pumpForm(tester, _reading(mode: 'claim'), startWithCrlv: true);
+
+    expect(find.text('Este veículo já está na RevisaLog'), findsOneWidget);
+  });
+
+  testWidgets('without startWithCrlv the form waits for the button',
+      (tester) async {
+    await _pumpForm(tester, _reading(mode: 'claim'));
+
+    expect(find.text('Este veículo já está na RevisaLog'), findsNothing);
+    expect(find.text('Cadastre com o CRLV-e'), findsOneWidget);
   });
 
   testWidgets('a CRLV-e that needs a power of attorney points to the site',

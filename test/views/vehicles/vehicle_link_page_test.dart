@@ -7,6 +7,7 @@ import 'package:vehicle_maintenance/models/vehicle.dart';
 import 'package:vehicle_maintenance/models/vehicle_lookup_result.dart';
 import 'package:vehicle_maintenance/repositories/vehicle_repository.dart';
 import 'package:vehicle_maintenance/services/api_service.dart';
+import 'package:vehicle_maintenance/views/vehicles/vehicle_form_page.dart';
 import 'package:vehicle_maintenance/views/vehicles/vehicle_link_page.dart';
 
 class _FakeApiService extends ApiService {
@@ -49,9 +50,66 @@ class _FakeApiService extends ApiService {
 
     return Response(
       requestOptions: RequestOptions(path: '/vehicles/$id/link'),
-      data: {'success': true, 'data': const {'id': 42}},
+      data: {
+        'success': true,
+        'data': const {'id': 42}
+      },
       statusCode: 200,
     );
+  }
+
+  String? claimedWith;
+
+  Response<dynamic> _ok(String path, Object? data) => Response(
+        requestOptions: RequestOptions(path: path),
+        data: {'success': true, 'data': data},
+        statusCode: 200,
+      );
+
+  @override
+  Future<Response<dynamic>> getTermsOfUse() async =>
+      _ok('/legal/terms-of-use', {'content': 'Termos de teste'});
+
+  @override
+  Future<List<String>> getCatalogBrands() async => const [];
+
+  @override
+  Future<List<String>> getCatalogModels(String brand) async => const [];
+
+  /// O CRLV-e da compradora: o veículo já existe e o documento está no CPF dela.
+  @override
+  Future<Response<dynamic>> readCrlv(String filePath) async =>
+      _ok('/vehicles/crlv', {
+        'mode': 'claim',
+        'ownership': 'owner',
+        'crlv_verification_token': 'f00dcafe',
+        'expires_in_minutes': 30,
+        'vehicle': {
+          'license_plate': 'ABC1D23',
+          'renavam': '12345678901',
+          'brand': 'VW',
+          'model': 'Gol',
+          'year': 2020,
+          'chassis': '9BWZZZ377VT004251',
+          'brand_matched': true,
+          'model_matched': true,
+        },
+        'existing_vehicle': {
+          'id': 42,
+          'brand': 'VW',
+          'model': 'Gol',
+          'year': 2020,
+          'maintenances_count': 7,
+        },
+      });
+
+  @override
+  Future<Response<dynamic>> claimVehicleWithCrlv(String token) async {
+    claimedWith = token;
+    return _ok('/vehicles/crlv/claim', {
+      'vehicle': {'id': 42},
+      'pending_workshop_records_count': 0,
+    });
   }
 
   @override
@@ -93,7 +151,7 @@ Vehicle _vehicle() => Vehicle(
       verifiedMaintenancesCount: 3,
     );
 
-Widget _wrap(ApiService apiService) {
+Widget _wrap(ApiService apiService, {CrlvPdfPicker? pickCrlvPdf}) {
   return MultiProvider(
     providers: [
       Provider<ApiService>.value(value: apiService),
@@ -101,8 +159,55 @@ Widget _wrap(ApiService apiService) {
         create: (_) => VehicleRepository(apiService),
       ),
     ],
-    child: const MaterialApp(home: VehicleLinkPage()),
+    child: MaterialApp(home: VehicleLinkPage(pickCrlvPdf: pickCrlvPdf)),
   );
+}
+
+/// A tela de vínculo aberta a partir de uma tela anterior, como no app, para
+/// que o cadastro aberto por "Enviar CRLV-e" tenha para onde voltar.
+Future<void> _pumpFromHome(
+  WidgetTester tester,
+  ApiService apiService, {
+  required CrlvPdfPicker pickCrlvPdf,
+}) async {
+  await tester.pumpWidget(
+    MultiProvider(
+      providers: [
+        Provider<ApiService>.value(value: apiService),
+        ChangeNotifierProvider<VehicleRepository>(
+          create: (_) => VehicleRepository(apiService),
+        ),
+      ],
+      child: MaterialApp(
+        home: Builder(
+          builder: (context) => Scaffold(
+            body: Center(
+              child: TextButton(
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => VehicleLinkPage(pickCrlvPdf: pickCrlvPdf),
+                  ),
+                ),
+                child: const Text('abrir'),
+              ),
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
+  await tester.tap(find.text('abrir'));
+  await tester.pumpAndSettle();
+}
+
+Future<void> _searchAndLink(WidgetTester tester) async {
+  await _fillDocument(tester);
+  await tester.tap(find.byKey(const Key('link_search_button')));
+  await tester.pumpAndSettle();
+
+  await tester.ensureVisible(find.byKey(const Key('link_confirm_button')));
+  await tester.tap(find.byKey(const Key('link_confirm_button')));
+  await tester.pumpAndSettle();
 }
 
 Future<void> _fillDocument(
@@ -273,8 +378,9 @@ void main() {
     );
   });
 
-  testWidgets('explains a vehicle that belongs to another account',
-      (tester) async {
+  testWidgets(
+      'a vehicle that belongs to another account points to the CRLV-e '
+      'instead of a bare 403', (tester) async {
     final api = _FakeApiService()
       ..searchResult = VehicleLookupResult(
         vehicle: _vehicle(),
@@ -283,17 +389,76 @@ void main() {
       ..linkError = _dioError(403, {'success': false});
 
     await tester.pumpWidget(_wrap(api));
-    await _fillDocument(tester);
-    await tester.tap(find.byKey(const Key('link_search_button')));
-    await tester.pumpAndSettle();
+    await _searchAndLink(tester);
 
-    await tester.tap(find.byKey(const Key('link_confirm_button')));
-    await tester.pumpAndSettle();
-
+    expect(find.byKey(const Key('link_other_account_card')), findsOneWidget);
+    expect(find.text('Este veículo está em outra conta'), findsOneWidget);
+    expect(find.byKey(const Key('link_send_crlv_button')), findsOneWidget);
+    expect(find.byKey(const Key('link_confirm_button')), findsNothing);
     expect(
       find.text('Você não tem permissão para fazer isso.'),
-      findsOneWidget,
+      findsNothing,
     );
+  });
+
+  testWidgets('editing the plate after a 403 starts over', (tester) async {
+    final api = _FakeApiService()
+      ..searchResult = VehicleLookupResult(
+        vehicle: _vehicle(),
+        matchedBy: VehicleLookupResult.matchCurrentPlate,
+      )
+      ..linkError = _dioError(403, {'success': false});
+
+    await tester.pumpWidget(_wrap(api));
+    await _searchAndLink(tester);
+
+    await tester.enterText(
+      find.byKey(const Key('link_plate_field')),
+      'XYZ9Z99',
+    );
+    await tester.pump();
+
+    expect(find.byKey(const Key('link_other_account_card')), findsNothing);
+    expect(find.byKey(const Key('link_search_button')), findsOneWidget);
+  });
+
+  testWidgets(
+      'the buyer sends the CRLV-e from the 403 and the vehicle comes to '
+      'her account', (tester) async {
+    var pickerCalls = 0;
+    final api = _FakeApiService()
+      ..searchResult = VehicleLookupResult(
+        vehicle: _vehicle(),
+        matchedBy: VehicleLookupResult.matchCurrentPlate,
+      )
+      ..linkError = _dioError(403, {'success': false});
+
+    await _pumpFromHome(
+      tester,
+      api,
+      pickCrlvPdf: () async {
+        pickerCalls++;
+        return '/tmp/CRLV-e.pdf';
+      },
+    );
+    await _searchAndLink(tester);
+
+    await tester.ensureVisible(find.byKey(const Key('link_send_crlv_button')));
+    await tester.tap(find.byKey(const Key('link_send_crlv_button')));
+    await tester.pumpAndSettle();
+
+    // O cadastro abre já pedindo o CRLV-e, sem um segundo toque.
+    expect(pickerCalls, 1);
+    expect(find.byType(VehicleLinkPage), findsNothing);
+    expect(find.text('Este veículo já está na RevisaLog'), findsOneWidget);
+
+    await tester.tap(find.text('Vincular'));
+    await tester.pumpAndSettle();
+
+    expect(api.claimedWith, 'f00dcafe');
+    expect(find.byType(VehicleFormPage), findsNothing);
+    expect(find.text('abrir'), findsOneWidget);
+    expect(find.text('Veículo vinculado à sua conta.'), findsOneWidget);
   });
 
   testWidgets('editing the plate drops the result of the previous search',

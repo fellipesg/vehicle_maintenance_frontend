@@ -35,10 +35,16 @@ class VehicleFormPage extends StatefulWidget {
   /// Trocável nos testes; no app abre o seletor de arquivos do sistema.
   final CrlvPdfPicker pickCrlvPdf;
 
+  /// Abre o seletor do CRLV-e assim que a tela aparece. É a entrada de quem veio
+  /// da tela de vínculo com um veículo de outra conta: só o CRLV-e no nome dela
+  /// transfere o veículo (modo `claim`).
+  final bool startWithCrlv;
+
   const VehicleFormPage({
     super.key,
     this.vehicle,
     this.pickCrlvPdf = _pickCrlvPdfFromDevice,
+    this.startWithCrlv = false,
   });
 
   @override
@@ -116,6 +122,14 @@ class _VehicleFormPageState extends State<VehicleFormPage> {
     // Editando: já há marca, então os modelos dela podem vir junto.
     if (_hasBrandText) {
       _loadCatalogModels(_brandController.text.trim());
+    }
+
+    if (widget.startWithCrlv && widget.vehicle == null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _pickAndReadCrlv();
+        }
+      });
     }
   }
 
