@@ -94,8 +94,10 @@ void main() {
     expect(facebookConfig, contains('FACEBOOK_APP_ID = 2189828138277238'));
     expect(
       facebookConfig,
-      contains('FACEBOOK_CLIENT_TOKEN = FACEBOOK_CLIENT_TOKEN_PLACEHOLDER'),
+      contains('FACEBOOK_CLIENT_TOKEN = f2e99ff0a50e089f40d0ea7e65a3e9b6'),
     );
+    expect(
+        facebookConfig, isNot(contains('FACEBOOK_CLIENT_TOKEN_PLACEHOLDER')));
     expect(facebookConfig, contains('FACEBOOK_DISPLAY_NAME = RevisaLog'));
     expect(debugConfig, contains('#include "Facebook.xcconfig"'));
     expect(releaseConfig, contains('#include "Facebook.xcconfig"'));
