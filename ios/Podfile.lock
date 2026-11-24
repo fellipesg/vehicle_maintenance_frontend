@@ -36,6 +36,12 @@ PODS:
   - DKPhotoGallery/Resource (0.0.19):
     - SDWebImage
     - SwiftyGif
+  - FBAEMKit (18.0.3):
+    - FBSDKCoreKit_Basics (= 18.0.3)
+  - FBSDKCoreKit (18.0.3):
+    - FBAEMKit (= 18.0.3)
+    - FBSDKCoreKit_Basics (= 18.0.3)
+  - FBSDKCoreKit_Basics (18.0.3)
   - file_picker (0.0.1):
     - DKImagePickerController/PhotoGallery
     - Flutter
@@ -163,6 +169,7 @@ PODS:
     - FlutterMacOS
 
 DEPENDENCIES:
+  - FBSDKCoreKit (= 18.0.3)
   - file_picker (from `.symlinks/plugins/file_picker/ios`)
   - firebase_core (from `.symlinks/plugins/firebase_core/ios`)
   - firebase_messaging (from `.symlinks/plugins/firebase_messaging/ios`)
@@ -187,6 +194,9 @@ SPEC REPOS:
     - AppAuth
     - DKImagePickerController
     - DKPhotoGallery
+    - FBAEMKit
+    - FBSDKCoreKit
+    - FBSDKCoreKit_Basics
     - Firebase
     - FirebaseCore
     - FirebaseCoreInternal
@@ -242,9 +252,12 @@ EXTERNAL SOURCES:
     :path: ".symlinks/plugins/webview_flutter_wkwebview/darwin"
 
 SPEC CHECKSUMS:
-  AppAuth: d4f13a8fe0baf391b2108511793e4b479691fb73
+  AppAuth: 58e37c546bb9bf2073c1392ccba8cef35ff283cb
   DKImagePickerController: 946cec48c7873164274ecc4624d19e3da4c1ef3c
   DKPhotoGallery: b3834fecb755ee09a593d7c9e389d8b5d6deed60
+  FBAEMKit: 2a6b529993713c185b02bc36f8c91129bf78dfb0
+  FBSDKCoreKit: 65d7f7a7d6fcc3aa6eb6e093ec737a4184fc6049
+  FBSDKCoreKit_Basics: 7bc9d8fde8f70985fba2ed7c1d07e319f969a991
   file_picker: b159e0c068aef54932bb15dc9fd1571818edaf49
   Firebase: 0312a2352584f782ea56f66d91606891d4607f06
   firebase_core: a626d00494efa398e7c54f25f1454a64c8abf197
@@ -258,9 +271,9 @@ SPEC CHECKSUMS:
   flutter_secure_storage: d33dac7ae2ea08509be337e775f6b59f1ff45f12
   google_sign_in_ios: 4111e87aa5e24a4404f00ea13479f35e571969cc
   GoogleDataTransport: 6c09b596d841063d76d4288cc2d2f42cc36e1e2a
-  GoogleSignIn: d4281ab6cf21542b1cfaff85c191f230b399d2db
+  GoogleSignIn: 4ac041cf807e78942e3c0863775a98ee8c8e0f7c
   GoogleUtilities: ea963c370a38a8069cc5f7ba4ca849a60b6d7d15
-  GTMAppAuth: f69bd07d68cd3b766125f7e072c45d7340dea0de
+  GTMAppAuth: 4a3fbbb34098b327feaa51cfbf98b0b12f6892e7
   GTMSessionFetcher: 5aea5ba6bd522a239e236100971f10cb71b96ab6
   image_cropper: d3ba338ce166ebe54a4e1de742829354b521d473
   image_picker_ios: 4f2f91b01abdb52842a8e277617df877e40f905b
@@ -279,6 +292,6 @@ SPEC CHECKSUMS:
   url_launcher_ios: bb13df5870e8c4234ca12609d04010a21be43dfa
   webview_flutter_wkwebview: 29eb20d43355b48fe7d07113835b9128f84e3af4
 
-PODFILE CHECKSUM: d085d790efc8dd88706664f97d4e01ec8c328fb6
+PODFILE CHECKSUM: 00a9a7e0c45f0c57c5a4d270859fcb620eb8977e
 
 COCOAPODS: 1.15.2
