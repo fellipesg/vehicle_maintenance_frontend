@@ -9,6 +9,7 @@ import '../../repositories/vehicle_repository.dart';
 import '../../services/api_error.dart';
 import '../../services/api_service.dart';
 import '../../widgets/vehicle_cover_avatar.dart';
+import 'vehicle_form_page.dart';
 
 /// Reivindica um veículo que já existe na base — o caminho que a mensagem de
 /// chassi duplicado manda o usuário procurar e que até agora não existia no app.
@@ -17,8 +18,15 @@ import '../../widgets/vehicle_cover_avatar.dart';
 /// contra o documento do veículo. Por isso a ficha do veículo encontrado não
 /// repete nenhum dos dois, mesmo que a busca pública devolva — mostrar o valor
 /// esperado tornaria a conferência inútil.
+///
+/// Placa e RENAVAM não tiram o veículo de outra conta (o backend responde 403:
+/// quem vendeu também conhece os dois). Nesse caso a tela leva ao CRLV-e, que
+/// transfere o veículo quando está no CPF/CNPJ da conta.
 class VehicleLinkPage extends StatefulWidget {
-  const VehicleLinkPage({super.key});
+  /// Trocável nos testes; passado ao cadastro aberto por "Enviar CRLV-e".
+  final CrlvPdfPicker? pickCrlvPdf;
+
+  const VehicleLinkPage({super.key, this.pickCrlvPdf});
 
   @override
   State<VehicleLinkPage> createState() => _VehicleLinkPageState();
@@ -33,6 +41,9 @@ class _VehicleLinkPageState extends State<VehicleLinkPage> {
   bool _isSearching = false;
   bool _isLinking = false;
   String? _notFoundMessage;
+
+  /// O vínculo voltou 403: o veículo encontrado é de outra conta.
+  bool _ownedByAnotherAccount = false;
 
   @override
   void dispose() {
@@ -73,13 +84,14 @@ class _VehicleLinkPageState extends State<VehicleLinkPage> {
 
   /// Qualquer edição invalida a ficha na tela: ela pertence à placa pesquisada.
   void _resetResult() {
-    if (_found == null && _notFoundMessage == null) {
+    if (_found == null && _notFoundMessage == null && !_ownedByAnotherAccount) {
       return;
     }
 
     setState(() {
       _found = null;
       _notFoundMessage = null;
+      _ownedByAnotherAccount = false;
     });
   }
 
@@ -178,19 +190,52 @@ class _VehicleLinkPageState extends State<VehicleLinkPage> {
       throw Exception(
         response.data is Map ? response.data['message'] : null,
       );
-    } catch (e) {
-      if (mounted) {
+    } on DioException catch (e) {
+      if (!mounted) {
+        return;
+      }
+
+      if (e.response?.statusCode == 403) {
         setState(() {
           _isLinking = false;
+          _ownedByAnotherAccount = true;
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(apiErrorMessage(e)),
-            backgroundColor: Colors.red,
-          ),
-        );
+
+        return;
       }
+
+      _showLinkError(e);
+    } catch (e) {
+      _showLinkError(e);
     }
+  }
+
+  void _showLinkError(Object e) {
+    if (mounted) {
+      setState(() {
+        _isLinking = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(apiErrorMessage(e)),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  /// Troca esta tela pelo cadastro com o seletor do CRLV-e já aberto. O cadastro
+  /// atualiza a lista e mostra o resultado sozinho.
+  void _openCrlvFlow() {
+    final picker = widget.pickCrlvPdf;
+
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute<bool>(
+        builder: (_) => picker == null
+            ? const VehicleFormPage(startWithCrlv: true)
+            : VehicleFormPage(startWithCrlv: true, pickCrlvPdf: picker),
+      ),
+    );
   }
 
   @override
@@ -291,7 +336,12 @@ class _VehicleLinkPageState extends State<VehicleLinkPage> {
                     ),
                   ),
                 ],
-                if (_found != null) ...[
+                if (_found != null && _ownedByAnotherAccount) ...[
+                  _foundCard(_found!, theme),
+                  const SizedBox(height: 16),
+                  _otherAccountCard(theme),
+                ],
+                if (_found != null && !_ownedByAnotherAccount) ...[
                   _foundCard(_found!, theme),
                   const SizedBox(height: 16),
                   FilledButton.icon(
@@ -321,6 +371,42 @@ class _VehicleLinkPageState extends State<VehicleLinkPage> {
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _otherAccountCard(ThemeData theme) {
+    return Card(
+      key: const Key('link_other_account_card'),
+      color: theme.colorScheme.secondaryContainer,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              'Este veículo está em outra conta',
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: theme.colorScheme.onSecondaryContainer,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Placa e RENAVAM não bastam para tirar o veículo de outra conta. '
+              'Se você o comprou, envie o CRLV-e no seu nome: ele confirma a '
+              'posse e traz o veículo para a sua conta, com o histórico.',
+              style: TextStyle(color: theme.colorScheme.onSecondaryContainer),
+            ),
+            const SizedBox(height: 16),
+            FilledButton.icon(
+              key: const Key('link_send_crlv_button'),
+              onPressed: _openCrlvFlow,
+              icon: const Icon(Icons.upload_file),
+              label: const Text('Enviar CRLV-e'),
+            ),
+          ],
         ),
       ),
     );
