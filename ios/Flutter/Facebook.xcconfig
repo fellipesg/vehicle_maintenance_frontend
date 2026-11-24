@@ -1,0 +1,9 @@
+// Meta SDK values substituted into ios/Runner/Info.plist.
+//
+// FACEBOOK_CLIENT_TOKEN is the Client token from the Meta App Dashboard
+// (Settings > Advanced). It was not available when this integration landed.
+// Replace FACEBOOK_CLIENT_TOKEN_PLACEHOLDER before a build that should send
+// events. Do not put the App Secret here.
+FACEBOOK_APP_ID = 2189828138277238
+FACEBOOK_CLIENT_TOKEN = FACEBOOK_CLIENT_TOKEN_PLACEHOLDER
+FACEBOOK_DISPLAY_NAME = RevisaLog

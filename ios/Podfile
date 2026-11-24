@@ -30,6 +30,13 @@ target 'Runner' do
   use_frameworks! :linkage => :static
 
   flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
+
+  # App events only (install and app open). No Facebook Login and no sharing.
+  # 18.0.3 is the last 18.x without the arm64e launch crash in 18.1.0–19.0.1,
+  # and it still builds on the Xcode this Flutter 3.35 project uses.
+  # SDK 19 requires Xcode 26.4; CocoaPods stopped at 19.0.0.
+  pod 'FBSDKCoreKit', '18.0.3'
+
   target 'RunnerTests' do
     inherit! :search_paths
   end

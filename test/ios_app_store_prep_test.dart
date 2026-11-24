@@ -79,6 +79,86 @@ void main() {
     );
   });
 
+  test('Meta SDK measures iOS installs and app opens without Login or sharing',
+      () {
+    final plist = File('ios/Runner/Info.plist').readAsStringSync();
+    final privacy = File('ios/Runner/PrivacyInfo.xcprivacy').readAsStringSync();
+    final podfile = File('ios/Podfile').readAsStringSync();
+    final appDelegate = File('ios/Runner/AppDelegate.swift').readAsStringSync();
+    final facebookConfig =
+        File('ios/Flutter/Facebook.xcconfig').readAsStringSync();
+    final debugConfig = File('ios/Flutter/Debug.xcconfig').readAsStringSync();
+    final releaseConfig =
+        File('ios/Flutter/Release.xcconfig').readAsStringSync();
+
+    expect(facebookConfig, contains('FACEBOOK_APP_ID = 2189828138277238'));
+    expect(
+      facebookConfig,
+      contains('FACEBOOK_CLIENT_TOKEN = FACEBOOK_CLIENT_TOKEN_PLACEHOLDER'),
+    );
+    expect(facebookConfig, contains('FACEBOOK_DISPLAY_NAME = RevisaLog'));
+    expect(debugConfig, contains('#include "Facebook.xcconfig"'));
+    expect(releaseConfig, contains('#include "Facebook.xcconfig"'));
+
+    expect(plist, contains('<key>FacebookAppID</key>'));
+    expect(plist, contains('<string>\$(FACEBOOK_APP_ID)</string>'));
+    expect(plist, contains('<key>FacebookClientToken</key>'));
+    expect(plist, contains('<string>\$(FACEBOOK_CLIENT_TOKEN)</string>'));
+    expect(plist, contains('<key>FacebookDisplayName</key>'));
+    expect(plist, contains('<string>\$(FACEBOOK_DISPLAY_NAME)</string>'));
+    expect(
+      plist,
+      matches(RegExp(
+        r'<key>FacebookAutoLogAppEventsEnabled</key>\s*<true\s*/>',
+      )),
+    );
+    expect(
+      plist,
+      matches(RegExp(
+        r'<key>FacebookAdvertiserIDCollectionEnabled</key>\s*<false\s*/>',
+      )),
+    );
+    expect(plist, contains('<string>fb\$(FACEBOOK_APP_ID)</string>'));
+    expect(plist, contains('v9wttpbfk9.skadnetwork'));
+    expect(plist, contains('n38lu8286q.skadnetwork'));
+
+    final trackingCopy = RegExp(
+      '<key>NSUserTrackingUsageDescription</key>\\s*<string>([^<]*)</string>',
+    ).firstMatch(plist);
+    expect(trackingCopy, isNotNull);
+    expect(trackingCopy!.group(1), contains('anúncios'));
+    expect(trackingCopy.group(1), contains('RevisaLog'));
+
+    expect(plist, isNot(contains('fbapi')));
+    expect(plist, isNot(contains('fb-messenger-share-api')));
+    expect(podfile, contains("pod 'FBSDKCoreKit', '18.0.3'"));
+    expect(
+      File('ios/Podfile.lock').readAsStringSync(),
+      contains('FBSDKCoreKit (18.0.3)'),
+    );
+    expect(podfile, isNot(contains('FBSDKLoginKit')));
+    expect(podfile, isNot(contains('FBSDKShareKit')));
+
+    expect(appDelegate, contains('import FBSDKCoreKit'));
+    expect(appDelegate, contains('ApplicationDelegate.shared.application'));
+    expect(appDelegate,
+        contains('ATTrackingManager.requestTrackingAuthorization'));
+    expect(
+        appDelegate, contains('isAdvertiserIDCollectionEnabled = authorized'));
+    expect(appDelegate, contains('isAdvertiserTrackingEnabled = authorized'));
+    expect(appDelegate, contains('isAutoLogAppEventsEnabled = true'));
+    expect(appDelegate, contains('AppEvents.shared.activateApp()'));
+    expect(appDelegate, contains('#unavailable(iOS 17)'));
+
+    expect(privacy, contains('<key>NSPrivacyTracking</key>'));
+    expect(
+      privacy,
+      matches(RegExp(r'<key>NSPrivacyTracking</key>\s*<true\s*/>')),
+    );
+    expect(privacy, contains('ep1.facebook.com'));
+    expect(privacy, contains('NSPrivacyCollectedDataTypeProductInteraction'));
+  });
+
   test('iOS permission texts describe camera and photo uses in pt-BR', () {
     final plist = File('ios/Runner/Info.plist').readAsStringSync();
 

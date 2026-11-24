@@ -48,6 +48,8 @@
 	<string>O app salva na galeria as fotos que você tira para o perfil, a capa do veículo e as manutenções.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>O app acessa suas fotos para você escolher a foto de perfil, a capa do veículo e as fotos das manutenções.</string>
+	<key>NSUserTrackingUsageDescription</key>
+	<string>Usamos esse identificador para medir instalações e aberturas do RevisaLog que vêm de anúncios.</string>
 	<key>NSUserNotificationsUsageDescription</key>
 	<string>O app usa notificações para avisar sobre manutenções e avisos da oficina.</string>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
@@ -104,10 +106,37 @@
 				<string>com.googleusercontent.apps.61844221484-rsrsid3h95u8ndjliogu4m0t37he45ao</string>
 			</array>
 		</dict>
+		<dict>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>fb$(FACEBOOK_APP_ID)</string>
+			</array>
+		</dict>
 	</array>
 	<key>GIDClientID</key>
 	<string>61844221484-rsrsid3h95u8ndjliogu4m0t37he45ao.apps.googleusercontent.com</string>
 	<key>GIDServerClientID</key>
 	<string>61844221484-b7jtd51c4apn6m9dauah8p7mqhis37e6.apps.googleusercontent.com</string>
+	<key>FacebookAppID</key>
+	<string>$(FACEBOOK_APP_ID)</string>
+	<key>FacebookClientToken</key>
+	<string>$(FACEBOOK_CLIENT_TOKEN)</string>
+	<key>FacebookDisplayName</key>
+	<string>$(FACEBOOK_DISPLAY_NAME)</string>
+	<key>FacebookAutoLogAppEventsEnabled</key>
+	<true/>
+	<key>FacebookAdvertiserIDCollectionEnabled</key>
+	<false/>
+	<key>SKAdNetworkItems</key>
+	<array>
+		<dict>
+			<key>SKAdNetworkIdentifier</key>
+			<string>v9wttpbfk9.skadnetwork</string>
+		</dict>
+		<dict>
+			<key>SKAdNetworkIdentifier</key>
+			<string>n38lu8286q.skadnetwork</string>
+		</dict>
+	</array>
 </dict>
 </plist>
