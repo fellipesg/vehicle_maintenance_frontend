@@ -152,6 +152,18 @@ void main() {
     expect(appDelegate, contains('AppEvents.shared.activateApp()'));
     expect(appDelegate, contains('#unavailable(iOS 17)'));
 
+    // UIScene: UIKit never calls the delegate method, so ATT was never asked.
+    expect(
+      appDelegate,
+      isNot(contains('override func applicationDidBecomeActive')),
+    );
+    expect(appDelegate, contains('UIApplication.didBecomeActiveNotification'));
+    expect(appDelegate, contains('isRequestingTrackingAuthorization'));
+    expect(
+      appDelegate.indexOf('observeMetaTrackingAuthorization()\n'),
+      lessThan(appDelegate.indexOf('configureMetaAppEvents(application')),
+    );
+
     expect(privacy, contains('<key>NSPrivacyTracking</key>'));
     expect(
       privacy,
@@ -159,6 +171,24 @@ void main() {
     );
     expect(privacy, contains('ep1.facebook.com'));
     expect(privacy, contains('NSPrivacyCollectedDataTypeProductInteraction'));
+  });
+
+  test('Meta events channel only accepts the whitelisted names', () {
+    final appDelegate = File('ios/Runner/AppDelegate.swift').readAsStringSync();
+
+    expect(appDelegate, contains('br.com.revisalog.app/meta_events'));
+    expect(
+      appDelegate,
+      contains('"complete_registration": .completedRegistration'),
+    );
+    expect(appDelegate, contains('AppEvents.Name("VehicleAdded")'));
+    expect(appDelegate, contains('FlutterMethodNotImplemented'));
+    expect(appDelegate, contains('AppEvents.shared.logEvent(eventName)'));
+    expect(appDelegate, isNot(contains('parameters:')));
+    expect(
+      appDelegate.indexOf('GeneratedPluginRegistrant.register(with: registry)'),
+      lessThan(appDelegate.indexOf('registerMetaEventsChannel(with: registry)')),
+    );
   });
 
   test('iOS permission texts describe camera and photo uses in pt-BR', () {

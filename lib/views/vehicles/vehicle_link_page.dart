@@ -8,6 +8,7 @@ import '../../models/vehicle_lookup_result.dart';
 import '../../repositories/vehicle_repository.dart';
 import '../../services/api_error.dart';
 import '../../services/api_service.dart';
+import '../../services/meta_app_events.dart';
 import '../../widgets/vehicle_cover_avatar.dart';
 import 'vehicle_form_page.dart';
 
@@ -26,7 +27,14 @@ class VehicleLinkPage extends StatefulWidget {
   /// Trocável nos testes; passado ao cadastro aberto por "Enviar CRLV-e".
   final CrlvPdfPicker? pickCrlvPdf;
 
-  const VehicleLinkPage({super.key, this.pickCrlvPdf});
+  /// Trocável nos testes; no app avisa a Meta de que a conta ganhou um veículo.
+  final MetaAppEvents metaAppEvents;
+
+  const VehicleLinkPage({
+    super.key,
+    this.pickCrlvPdf,
+    this.metaAppEvents = const MetaAppEvents(),
+  });
 
   @override
   State<VehicleLinkPage> createState() => _VehicleLinkPageState();
@@ -161,6 +169,12 @@ class _VehicleLinkPageState extends State<VehicleLinkPage> {
       );
 
       if (response.data is Map && response.data['success'] == true) {
+        if (!mounted) {
+          return;
+        }
+
+        await widget.metaAppEvents.logVehicleAdded();
+
         if (!mounted) {
           return;
         }

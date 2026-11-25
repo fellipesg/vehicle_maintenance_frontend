@@ -10,6 +10,7 @@ import '../../models/vehicle.dart';
 import '../../repositories/vehicle_repository.dart';
 import '../../services/api_error.dart';
 import '../../services/api_service.dart';
+import '../../services/meta_app_events.dart';
 import '../../widgets/vehicle_cover_avatar.dart';
 import '../../widgets/catalog_autocomplete.dart';
 import '../../widgets/cover_framing.dart';
@@ -40,11 +41,15 @@ class VehicleFormPage extends StatefulWidget {
   /// transfere o veículo (modo `claim`).
   final bool startWithCrlv;
 
+  /// Trocável nos testes; no app avisa a Meta de que a conta ganhou um veículo.
+  final MetaAppEvents metaAppEvents;
+
   const VehicleFormPage({
     super.key,
     this.vehicle,
     this.pickCrlvPdf = _pickCrlvPdfFromDevice,
     this.startWithCrlv = false,
+    this.metaAppEvents = const MetaAppEvents(),
   });
 
   @override
@@ -403,6 +408,10 @@ class _VehicleFormPageState extends State<VehicleFormPage> {
         );
       }
 
+      if (response.data['success'] == true && widget.vehicle == null) {
+        await widget.metaAppEvents.logVehicleAdded();
+      }
+
       if (response.data['success'] == true && mounted) {
         await context.read<VehicleRepository>().invalidate();
         Navigator.of(context).pop(true);
@@ -567,6 +576,8 @@ class _VehicleFormPageState extends State<VehicleFormPage> {
     }
 
     final pending = response.data['data']?['pending_workshop_records_count'];
+    await widget.metaAppEvents.logVehicleAdded();
+
     if (!mounted) return;
 
     await context.read<VehicleRepository>().invalidate();

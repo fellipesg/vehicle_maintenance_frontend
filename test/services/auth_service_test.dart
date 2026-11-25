@@ -6,6 +6,7 @@ import 'package:vehicle_maintenance/services/api_service.dart';
 import 'package:vehicle_maintenance/services/auth_service.dart';
 import 'package:vehicle_maintenance/services/auth_token_storage.dart';
 import 'package:vehicle_maintenance/services/fcm_service.dart';
+import 'package:vehicle_maintenance/services/meta_app_events.dart';
 
 class FakeAuthTokenStorage implements AuthTokenStorage {
   String? token;
@@ -30,6 +31,16 @@ class FakeFcmService extends Fake implements FcmService {
 
   @override
   Future<void> registerTokenAfterAuth() async {}
+}
+
+class RecordingMetaAppEvents implements MetaAppEvents {
+  int completeRegistration = 0;
+
+  @override
+  Future<void> logCompleteRegistration() async => completeRegistration++;
+
+  @override
+  Future<void> logVehicleAdded() async {}
 }
 
 void main() {
@@ -413,6 +424,60 @@ void main() {
       expect(authService.token, 'verified-token');
       expect(authService.isAuthenticated, isTrue);
       expect(authService.user, {'id': 1, 'name': 'Test User'});
+    });
+  });
+
+  group('AuthService Meta events', () {
+    late ApiService apiService;
+    late RecordingMetaAppEvents meta;
+    late AuthService authService;
+
+    setUp(() {
+      SharedPreferences.setMockInitialValues({});
+      apiService = ApiService(baseUrl: 'http://localhost:8000/api/v1');
+      meta = RecordingMetaAppEvents();
+      authService = AuthService(
+        apiService,
+        tokenStorage: FakeAuthTokenStorage(),
+        fcmService: FakeFcmService(),
+        metaAppEvents: meta,
+      );
+    });
+
+    void stubRegister(Map<String, dynamic> body) {
+      apiService.dio.interceptors.add(
+        InterceptorsWrapper(
+          onRequest: (options, handler) {
+            handler.resolve(Response(requestOptions: options, data: body));
+          },
+        ),
+      );
+    }
+
+    Future<bool> register() => authService.register(
+          name: 'Ana',
+          email: 'ana@example.com',
+          password: 'secret-123',
+        );
+
+    test('a successful register logs complete_registration', () async {
+      stubRegister({
+        'success': true,
+        'data': {
+          'token': 't',
+          'user': {'id': 1},
+        },
+      });
+
+      expect(await register(), isTrue);
+      expect(meta.completeRegistration, 1);
+    });
+
+    test('a refused register logs nothing', () async {
+      stubRegister({'success': false});
+
+      expect(await register(), isFalse);
+      expect(meta.completeRegistration, 0);
     });
   });
 }

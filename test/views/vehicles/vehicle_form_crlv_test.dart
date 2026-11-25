@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vehicle_maintenance/models/crlv_reading.dart';
 import 'package:vehicle_maintenance/repositories/vehicle_repository.dart';
 import 'package:vehicle_maintenance/services/api_service.dart';
+import 'package:vehicle_maintenance/services/meta_app_events.dart';
 import 'package:vehicle_maintenance/views/vehicles/vehicle_form_page.dart';
 
 const _token = 'f00dcafe';
@@ -42,6 +43,16 @@ Map<String, dynamic> _reading({
           }
         : null,
   };
+}
+
+class _RecordingMetaEvents implements MetaAppEvents {
+  int vehicleAdded = 0;
+
+  @override
+  Future<void> logVehicleAdded() async => vehicleAdded++;
+
+  @override
+  Future<void> logCompleteRegistration() async {}
 }
 
 class _FakeApiService extends ApiService {
@@ -108,6 +119,7 @@ Future<_FakeApiService> _pumpForm(
   WidgetTester tester,
   Map<String, dynamic> reading, {
   bool startWithCrlv = false,
+  MetaAppEvents metaAppEvents = const MetaAppEvents(),
 }) async {
   SharedPreferences.setMockInitialValues({});
   final api = _FakeApiService(reading);
@@ -128,6 +140,7 @@ Future<_FakeApiService> _pumpForm(
                     builder: (_) => VehicleFormPage(
                       pickCrlvPdf: () async => '/tmp/CRLV-e.pdf',
                       startWithCrlv: startWithCrlv,
+                      metaAppEvents: metaAppEvents,
                     ),
                   ),
                 ),
@@ -203,8 +216,44 @@ void main() {
     expect(api.createdWith?['current_kilometers'], 42000);
   });
 
-  testWidgets('a registered vehicle is claimed after confirming',
-      (tester) async {
+  testWidgets('creating a vehicle logs vehicle_added once', (tester) async {
+    final meta = _RecordingMetaEvents();
+    await _pumpForm(tester, _reading(), metaAppEvents: meta);
+
+    await tester.tap(find.byKey(const Key('vehicle_crlv_pick')));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Quilometragem atual *'),
+      '42000',
+    );
+    final checkbox = find.byType(CheckboxListTile);
+    await tester.ensureVisible(checkbox);
+    await tester.tap(checkbox);
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Cadastrar'));
+    await tester.tap(find.text('Cadastrar'));
+    await tester.pumpAndSettle();
+
+    expect(meta.vehicleAdded, 1);
+  });
+
+  testWidgets('claiming a vehicle by CRLV-e logs vehicle_added', (
+    tester,
+  ) async {
+    final meta = _RecordingMetaEvents();
+    await _pumpForm(tester, _reading(mode: 'claim'), metaAppEvents: meta);
+
+    await tester.tap(find.byKey(const Key('vehicle_crlv_pick')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Vincular'));
+    await tester.pumpAndSettle();
+
+    expect(meta.vehicleAdded, 1);
+  });
+
+  testWidgets('a registered vehicle is claimed after confirming', (
+    tester,
+  ) async {
     final api = await _pumpForm(tester, _reading(mode: 'claim'));
 
     await tester.tap(find.byKey(const Key('vehicle_crlv_pick')));
