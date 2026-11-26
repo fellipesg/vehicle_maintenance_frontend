@@ -12,12 +12,14 @@ import 'api_service.dart';
 import 'auth_token_storage.dart';
 import 'fcm_service.dart';
 import 'maintenance_photos_feature.dart';
+import 'meta_app_events.dart';
 
 class AuthService {
   final ApiService _apiService;
   VehicleRepository? vehicleRepository;
   final AuthTokenStorage _tokenStorage;
   FcmService? _fcmService;
+  final MetaAppEvents _metaAppEvents;
   static const String _legacyTokenKey = SecureAuthTokenStorage.tokenKey;
   static const String _userKey = 'user_data';
 
@@ -25,7 +27,9 @@ class AuthService {
     this._apiService, {
     AuthTokenStorage? tokenStorage,
     FcmService? fcmService,
-  }) : _tokenStorage = tokenStorage ?? SecureAuthTokenStorage() {
+    MetaAppEvents metaAppEvents = const MetaAppEvents(),
+  })  : _tokenStorage = tokenStorage ?? SecureAuthTokenStorage(),
+        _metaAppEvents = metaAppEvents {
     _fcmService = fcmService ?? FcmService(_apiService);
   }
 
@@ -153,6 +157,7 @@ class AuthService {
 
         // Register FCM token after successful registration
         _fcmService?.registerTokenAfterAuth();
+        await _metaAppEvents.logCompleteRegistration();
 
         return true;
       }

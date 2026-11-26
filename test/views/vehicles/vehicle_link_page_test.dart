@@ -7,8 +7,19 @@ import 'package:vehicle_maintenance/models/vehicle.dart';
 import 'package:vehicle_maintenance/models/vehicle_lookup_result.dart';
 import 'package:vehicle_maintenance/repositories/vehicle_repository.dart';
 import 'package:vehicle_maintenance/services/api_service.dart';
+import 'package:vehicle_maintenance/services/meta_app_events.dart';
 import 'package:vehicle_maintenance/views/vehicles/vehicle_form_page.dart';
 import 'package:vehicle_maintenance/views/vehicles/vehicle_link_page.dart';
+
+class _RecordingMetaEvents implements MetaAppEvents {
+  int vehicleAdded = 0;
+
+  @override
+  Future<void> logVehicleAdded() async => vehicleAdded++;
+
+  @override
+  Future<void> logCompleteRegistration() async {}
+}
 
 class _FakeApiService extends ApiService {
   _FakeApiService() : super(baseUrl: 'http://test');
@@ -151,7 +162,11 @@ Vehicle _vehicle() => Vehicle(
       verifiedMaintenancesCount: 3,
     );
 
-Widget _wrap(ApiService apiService, {CrlvPdfPicker? pickCrlvPdf}) {
+Widget _wrap(
+  ApiService apiService, {
+  CrlvPdfPicker? pickCrlvPdf,
+  MetaAppEvents metaAppEvents = const MetaAppEvents(),
+}) {
   return MultiProvider(
     providers: [
       Provider<ApiService>.value(value: apiService),
@@ -159,7 +174,12 @@ Widget _wrap(ApiService apiService, {CrlvPdfPicker? pickCrlvPdf}) {
         create: (_) => VehicleRepository(apiService),
       ),
     ],
-    child: MaterialApp(home: VehicleLinkPage(pickCrlvPdf: pickCrlvPdf)),
+    child: MaterialApp(
+      home: VehicleLinkPage(
+        pickCrlvPdf: pickCrlvPdf,
+        metaAppEvents: metaAppEvents,
+      ),
+    ),
   );
 }
 
@@ -484,5 +504,42 @@ void main() {
 
     expect(find.byKey(const Key('link_found_card')), findsNothing);
     expect(find.byKey(const Key('link_search_button')), findsOneWidget);
+  });
+
+  testWidgets('a successful link logs vehicle_added once', (tester) async {
+    final meta = _RecordingMetaEvents();
+    final api = _FakeApiService()
+      ..searchResult = VehicleLookupResult(
+        vehicle: _vehicle(),
+        matchedBy: VehicleLookupResult.matchCurrentPlate,
+      );
+
+    await tester.pumpWidget(_wrap(api, metaAppEvents: meta));
+    await _fillDocument(tester);
+    await tester.tap(find.byKey(const Key('link_search_button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('link_confirm_button')));
+    await tester.pumpAndSettle();
+
+    expect(meta.vehicleAdded, 1);
+  });
+
+  testWidgets('a failed link does not log vehicle_added', (tester) async {
+    final meta = _RecordingMetaEvents();
+    final api = _FakeApiService()
+      ..searchResult = VehicleLookupResult(
+        vehicle: _vehicle(),
+        matchedBy: VehicleLookupResult.matchCurrentPlate,
+      )
+      ..linkError = _dioError(403, {'success': false});
+
+    await tester.pumpWidget(_wrap(api, metaAppEvents: meta));
+    await _fillDocument(tester);
+    await tester.tap(find.byKey(const Key('link_search_button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('link_confirm_button')));
+    await tester.pumpAndSettle();
+
+    expect(meta.vehicleAdded, 0);
   });
 }
